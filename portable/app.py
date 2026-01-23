@@ -149,39 +149,22 @@ def normalize_audio(wav, eps=1e-12, clip=True):
     return y
 
 
-def audio_to_tuple(audio, max_duration_sec: float = 15.0) -> Optional[Tuple[np.ndarray, int]]:
-    """Конвертация аудио Gradio в кортеж (wav, sr) с ограничением длины."""
+def audio_to_tuple(audio) -> Optional[Tuple[np.ndarray, int]]:
+    """Конвертация аудио Gradio в кортеж (wav, sr)."""
     if audio is None:
         return None
-
-    wav = None
-    sr = None
 
     if isinstance(audio, tuple) and len(audio) == 2 and isinstance(audio[0], int):
         sr, wav = audio
         wav = normalize_audio(wav)
-        sr = int(sr)
-    elif isinstance(audio, dict) and "sampling_rate" in audio and "data" in audio:
+        return wav, int(sr)
+
+    if isinstance(audio, dict) and "sampling_rate" in audio and "data" in audio:
         sr = int(audio["sampling_rate"])
         wav = normalize_audio(audio["data"])
-    elif isinstance(audio, str):
-        # Путь к файлу
-        import librosa
-        wav, sr = librosa.load(audio, sr=None, mono=True)
-        wav = wav.astype(np.float32)
-    else:
-        return None
+        return wav, sr
 
-    if wav is None or sr is None:
-        return None
-
-    # Ограничение длины аудио
-    max_samples = int(max_duration_sec * sr)
-    if len(wav) > max_samples:
-        print(f"Аудио обрезано с {len(wav)/sr:.1f}с до {max_duration_sec}с")
-        wav = wav[:max_samples]
-
-    return wav, sr
+    return None
 
 
 def save_audio_file(audio_data: np.ndarray, sample_rate: int, output_dir: str = "output") -> str:
@@ -292,18 +275,9 @@ def generate_voice_clone(
         yield None, "Ошибка: Введите текст для синтеза."
         return
 
-    # Ограничение длины референсного аудио - 15 секунд максимум
-    audio_tuple = audio_to_tuple(ref_audio, max_duration_sec=15.0)
+    audio_tuple = audio_to_tuple(ref_audio)
     if audio_tuple is None:
-        yield None, "Ошибка: Загрузите референсное аудио (WAV, MP3, FLAC). Рекомендуемая длина: 3-10 секунд."
-        return
-
-    wav, sr = audio_tuple
-    audio_len = len(wav) / sr
-    print(f"Референсное аудио: {audio_len:.1f} сек, {sr} Hz")
-
-    if audio_len < 1.0:
-        yield None, f"Ошибка: Референсное аудио слишком короткое ({audio_len:.1f}с). Минимум 1 секунда."
+        yield None, "Ошибка: Загрузите референсное аудио."
         return
 
     if not use_xvector_only and (not ref_text or not ref_text.strip()):
@@ -314,10 +288,10 @@ def generate_voice_clone(
     stop_generation = False
 
     try:
-        yield None, f"Загрузка модели Base {model_size}..."
+        yield None, "Загрузка модели Base..."
         tts = get_model("Base", model_size)
 
-        yield None, f"Обработка референсного аудио ({audio_len:.1f} сек)...\nТекст для синтеза: {target_text[:50]}..."
+        yield None, f"Клонирование голоса...\nТекст: {target_text[:50]}..."
 
         # Получаем реальный код языка
         lang_code = "Auto"
@@ -328,7 +302,7 @@ def generate_voice_clone(
 
         start_time = time.time()
 
-        wavs, out_sr = tts.generate_voice_clone(
+        wavs, sr = tts.generate_voice_clone(
             text=target_text.strip(),
             language=lang_code,
             ref_audio=audio_tuple,
@@ -345,24 +319,19 @@ def generate_voice_clone(
             return
 
         generation_time = time.time() - start_time
-        output_duration = len(wavs[0]) / out_sr
+        audio_duration = len(wavs[0]) / sr
 
         # Сохраняем файл
-        saved_path = save_audio_file(wavs[0], out_sr)
+        saved_path = save_audio_file(wavs[0], sr)
 
         status = f"Клонирование завершено!\n"
-        status += f"Референс: {audio_len:.1f} сек\n"
         status += f"Время генерации: {generation_time:.2f} сек\n"
-        status += f"Длительность результата: {output_duration:.2f} сек\n"
+        status += f"Длительность аудио: {audio_duration:.2f} сек\n"
         status += f"Файл сохранен: {saved_path}"
 
-        yield (out_sr, wavs[0]), status
+        yield (sr, wavs[0]), status
 
-    except torch.cuda.OutOfMemoryError:
-        yield None, "Ошибка: Недостаточно памяти GPU. Попробуйте:\n- Использовать модель 0.6B\n- Уменьшить длину текста\n- Перезапустить приложение"
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         yield None, f"Ошибка: {type(e).__name__}: {e}"
     finally:
         is_generating = False
@@ -613,18 +582,12 @@ def build_ui():
             # Вкладка 2: Клонирование голоса (Base)
             # =====================================================
             with gr.Tab("Клонирование голоса", id="clone"):
-                gr.Markdown("""### Клонирование голоса из референсного аудио
-
-**Рекомендации:**
-- Длина референсного аудио: **3-10 секунд** (максимум 15 сек)
-- Чистая запись без шума и музыки
-- Один говорящий на записи
-""")
+                gr.Markdown("### Клонирование голоса из референсного аудио")
 
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="settings-card"):
                         vc_ref_audio = gr.Audio(
-                            label="Референсное аудио (3-10 сек)",
+                            label="Референсное аудио (голос для клонирования)",
                             type="numpy",
                             sources=["upload", "microphone"],
                         )
