@@ -1049,7 +1049,14 @@ def build_ui():
         secondary_hue="purple",
     )
 
-    with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
+    # JavaScript для установки темной темы по умолчанию
+    js_dark_theme = """
+    () => {
+        document.body.classList.add('dark');
+    }
+    """
+
+    with gr.Blocks(theme=theme, css=css, title=APP_NAME, js=js_dark_theme) as demo:
         # Заголовок
         gr.HTML(f"""
         <div class="main-header">
