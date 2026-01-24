@@ -206,21 +206,21 @@ if "%GPU_CHOICE%"=="6" (
 echo.
 
 echo [5.7/6] Загрузка голосового пакета...
-if exist "voices\voice-pack-installed.txt" (
-    echo Голосовой пакет уже установлен, пропускаем...
-) else (
-    echo Загрузка voice-pack.zip из HuggingFace (nerualdreming/VibeVoice)...
-    python\python.exe -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='nerualdreming/VibeVoice', filename='voice-pack.zip', repo_type='dataset', local_dir='downloads')"
+if exist "voices\voice-pack-installed.txt" goto skip_voicepack
 
-    if exist "downloads\voice-pack.zip" (
-        echo Распаковка голосового пакета...
-        powershell -Command "& {Expand-Archive -Path 'downloads\voice-pack.zip' -DestinationPath 'voices' -Force}"
-        echo installed> voices\voice-pack-installed.txt
-        echo Голосовой пакет установлен успешно!
-    ) else (
-        echo Не удалось загрузить голосовой пакет. Вы можете скачать его позже.
-    )
+echo Загрузка voice-pack.zip из HuggingFace...
+curl -L -o downloads\voice-pack.zip https://huggingface.co/datasets/nerualdreming/VibeVoice/resolve/main/voice-pack.zip
+
+if exist "downloads\voice-pack.zip" (
+    echo Распаковка голосового пакета...
+    powershell -Command "Expand-Archive -Path 'downloads\voice-pack.zip' -DestinationPath 'voices' -Force"
+    echo installed> voices\voice-pack-installed.txt
+    echo Голосовой пакет установлен успешно!
+) else (
+    echo Не удалось загрузить голосовой пакет.
 )
+
+:skip_voicepack
 
 echo [6/6] Финализация установки...
 REM Создаем конфигурационный файл с версией CUDA
