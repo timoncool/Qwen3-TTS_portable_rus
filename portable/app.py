@@ -1051,7 +1051,7 @@ def build_ui():
 
     # JavaScript для установки темной темы по умолчанию (официальный способ)
     js_dark_theme = """
-    function refresh() {
+    () => {
         const url = new URL(window.location);
         if (url.searchParams.get('__theme') !== 'dark') {
             url.searchParams.set('__theme', 'dark');
