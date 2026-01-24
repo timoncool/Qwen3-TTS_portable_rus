@@ -1054,11 +1054,11 @@ def build_ui():
         gr.HTML(f"""
         <div class="main-header">
             <h1>{APP_NAME} v{APP_VERSION}</h1>
-            <p>Синтез речи с Multi-speaker режимом и профилями голосов</p>
-            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem;">
-                Собрал <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">Nerual Dreaming</a> -
-                основатель <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>,
-                техноблогер и нейро-евангелист.
+            <p>Синтез речи с Multi-speaker режимом и клонированием голоса</p>
+            <p style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.5rem;">
+                <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">@nerual_dreming</a> — основатель
+                <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a> ·
+                <a href="https://t.me/neuroport" target="_blank" style="color: white;">НЕЙРО-СОФТ</a>
             </p>
         </div>
         """)
