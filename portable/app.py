@@ -1513,7 +1513,7 @@ def build_ui():
                 def multi_speaker_wrapper(script, num_speakers, audio0, audio1, audio2, audio3, text0, text1, text2, text3, language, model_size, max_tokens, temperature, top_p):
                     audios = [audio0, audio1, audio2, audio3]
                     texts = [text0, text1, text2, text3]
-                    return generate_multi_speaker(script, num_speakers, audios, texts, language, model_size, max_tokens, temperature, top_p)
+                    yield from generate_multi_speaker(script, num_speakers, audios, texts, language, model_size, max_tokens, temperature, top_p)
 
                 ms_generate_btn.click(
                     multi_speaker_wrapper,
