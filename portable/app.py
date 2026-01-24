@@ -1050,9 +1050,10 @@ def build_ui():
         <div class="main-header">
             <h1>{APP_NAME} v{APP_VERSION}</h1>
             <p>Синтез речи с Multi-speaker режимом и профилями голосов</p>
-            <p style="font-size: 0.9rem; margin-top: 0.5rem;">
-                Автор: <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">@nerual_dreming</a> |
-                <a href="https://artgeneration.me" target="_blank" style="color: white;">ArtGeneration.me</a>
+            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem;">
+                Собрал <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">Nerual Dreaming</a> -
+                основатель <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>,
+                техноблогер и нейро-евангелист.
             </p>
         </div>
         """)
@@ -1675,7 +1676,11 @@ def build_ui():
 
 Создано на основе [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) от Alibaba Qwen Team.
 
-**Автор:** [@nerual_dreming](https://t.me/nerual_dreming) - [ArtGeneration.me](https://artgeneration.me)
+### Авторы:
+
+**[Nerual Dreaming](https://t.me/nerual_dreming)** - база, основной код, основатель [ArtGeneration.me](https://artgeneration.me), техноблогер и нейро-евангелист.
+
+---
 
 **Поддерживаемые языки:** Русский, Английский, Китайский, Японский, Корейский, Французский, Немецкий, Испанский, Португальский, Итальянский
 
