@@ -1057,8 +1057,10 @@ def build_ui():
             <p>Синтез речи с Multi-speaker режимом и клонированием голоса</p>
             <p style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.5rem;">
                 <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">@nerual_dreming</a> — основатель
-                <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a> ·
-                <a href="https://t.me/neuroport" target="_blank" style="color: white;">НЕЙРО-СОФТ</a>
+                <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>
+            </p>
+            <p style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.3rem;">
+                <a href="https://t.me/neuroport" target="_blank" style="color: white;">Нейро-Софт</a> — репаки и портативки полезных нейросетей
             </p>
         </div>
         """)
