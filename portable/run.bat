@@ -88,9 +88,7 @@ echo.
 echo ========================================
 echo.
 
-REM Открываем браузер с темной темой через 3 секунды
-start /b cmd /c "timeout /t 3 /nobreak >nul && start http://127.0.0.1:7860/?__theme=dark"
-
+start http://127.0.0.1:7860/?__theme=dark
 python\python.exe app.py
 
 if errorlevel 1 (
