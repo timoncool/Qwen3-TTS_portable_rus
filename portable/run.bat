@@ -81,14 +81,13 @@ echo Запуск Qwen3-TTS...
 echo.
 echo После запуска приложение будет доступно по адресу:
 echo.
-echo    http://127.0.0.1:7860/?__theme=dark
+echo    http://127.0.0.1:7860
 echo.
 echo Для остановки приложения нажмите Ctrl+C
 echo.
 echo ========================================
 echo.
 
-start http://127.0.0.1:7860/?__theme=dark
 python\python.exe app.py
 
 if errorlevel 1 (
