@@ -76,6 +76,9 @@ REM =====================================================
 set PYTHONIOENCODING=utf-8
 set PYTHONUNBUFFERED=1
 
+REM Добавляем родительскую папку в PYTHONPATH для доступа к qwen_tts
+set "PYTHONPATH=%SCRIPT_DIR%..;%PYTHONPATH%"
+
 REM Добавляем SoX в PATH
 if exist "%SCRIPT_DIR%sox" (
     set "PATH=%SCRIPT_DIR%sox;%PATH%"

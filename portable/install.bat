@@ -155,9 +155,15 @@ python\python.exe -m pip install numpy --no-warn-script-location
 python\python.exe -m pip install huggingface_hub --no-warn-script-location
 python\python.exe -m pip install safetensors --no-warn-script-location
 
-REM Устанавливаем qwen_tts из родительской папки
-echo Установка qwen_tts модуля...
-python\python.exe -m pip install -e .. --no-warn-script-location
+REM Устанавливаем qwen_tts из родительской папки (если она существует)
+if exist "..\pyproject.toml" (
+    echo Установка qwen_tts модуля...
+    python\python.exe -m pip install -e .. --no-warn-script-location
+) else (
+    echo ВНИМАНИЕ: pyproject.toml не найден в родительской папке.
+    echo Убедитесь что папка portable находится внутри репозитория Qwen3-TTS_portable_rus
+    echo Пропускаем установку qwen_tts модуля...
+)
 
 echo [5.5/6] Установка Flash Attention 2 (опционально)...
 echo.
