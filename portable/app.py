@@ -984,11 +984,12 @@ def stop_generation_fn():
 # =====================================================
 
 def get_local_voices() -> Dict[str, str]:
-    """Получение списка локальных голосов."""
+    """Получение списка локальных голосов (включая подпапки)."""
     voices = {}
     supported_ext = ('.wav', '.mp3', '.flac', '.ogg', '.m4a')
 
-    for path in VOICES_DIR.iterdir():
+    # Рекурсивный поиск во всех подпапках
+    for path in VOICES_DIR.rglob("*"):
         if path.is_file() and path.suffix.lower() in supported_ext:
             voices[path.stem] = str(path)
 
@@ -997,8 +998,12 @@ def get_local_voices() -> Dict[str, str]:
 
 def get_voice_text(voice_name: str) -> Optional[str]:
     """Получение текста для голоса (если есть)."""
+    # Ищем в основной папке
     txt_path = VOICES_DIR / f"{voice_name}.txt"
     if txt_path.exists():
+        return txt_path.read_text(encoding="utf-8").strip()
+    # Ищем в подпапках
+    for txt_path in VOICES_DIR.rglob(f"{voice_name}.txt"):
         return txt_path.read_text(encoding="utf-8").strip()
     return None
 
