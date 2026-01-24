@@ -1148,6 +1148,23 @@ def build_ui():
                             interactive=False,
                         )
 
+                        # Примеры стилей
+                        gr.Markdown("**Примеры стилей** (кликни для применения)")
+                        gr.Examples(
+                            examples=[
+                                ["Speak with warmth and a gentle smile"],
+                                ["Speak with excitement and high energy"],
+                                ["Speak slowly and calmly, relaxed tone"],
+                                ["Speak with authority and confidence"],
+                                ["Speak softly, like telling a secret"],
+                                ["Speak with sadness in voice"],
+                                ["Speak angrily with sharp emphasis"],
+                                ["Speak in a playful, teasing manner"],
+                            ],
+                            inputs=[cv_instruct],
+                            label=""
+                        )
+
                 cv_generate_btn.click(
                     generate_custom_voice,
                     inputs=[cv_text, cv_language, cv_speaker, cv_instruct, cv_model_size, cv_max_tokens, cv_temperature, cv_top_p],
