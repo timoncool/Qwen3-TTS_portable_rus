@@ -976,6 +976,23 @@ def get_voice_text(voice_name: str) -> Optional[str]:
     return None
 
 
+def get_first_ru_voice(voices: Dict[str, str]) -> Optional[str]:
+    """Получение первого голоса, начинающегося с RU_."""
+    for name in sorted(voices.keys()):
+        if name.upper().startswith("RU_"):
+            return name
+    return None
+
+
+def get_random_ru_voices(voices: Dict[str, str], count: int = 2) -> List[str]:
+    """Получение случайных голосов, начинающихся с RU_."""
+    import random
+    ru_voices = [name for name in voices.keys() if name.upper().startswith("RU_")]
+    if len(ru_voices) < count:
+        return ru_voices + [None] * (count - len(ru_voices))
+    return random.sample(ru_voices, count)
+
+
 # =====================================================
 # Построение интерфейса
 # =====================================================
@@ -1096,7 +1113,7 @@ def build_ui():
                             label="Текст для синтеза",
                             lines=4,
                             placeholder="Введите текст, который нужно озвучить...",
-                            value="Привет! Это демонстрация системы синтеза речи Qwen3-TTS. Она поддерживает русский язык и множество других языков."
+                            value="Привет! Это демонстрация системы синтеза речи Qwen3-TTS, портативная версия от канала Нейро-софт. Она поддерживает русский язык и множество других языков."
                         )
 
                         with gr.Row():
@@ -1192,10 +1209,11 @@ def build_ui():
                     with gr.Column(scale=1, elem_classes="settings-card"):
                         # Выбор голоса из библиотеки
                         local_voices = get_local_voices()
+                        first_ru_voice = get_first_ru_voice(local_voices)
                         vc_voice_preset = gr.Dropdown(
                             label="Выбрать голос из библиотеки",
                             choices=["-- Загрузить свой --"] + list(local_voices.keys()),
-                            value="-- Загрузить свой --",
+                            value=first_ru_voice if first_ru_voice else "-- Загрузить свой --",
                             interactive=True,
                         )
                         vc_refresh_voices = gr.Button("Обновить список", size="sm")
@@ -1245,6 +1263,7 @@ def build_ui():
                             label="Текст для синтеза",
                             lines=4,
                             placeholder="Введите текст, который нужно озвучить клонированным голосом...",
+                            value="Ничего себе, мой голос клонированный с помощью Qwen3-TTS звучит почти как настоящий!",
                         )
 
                         with gr.Row():
@@ -1374,6 +1393,8 @@ def build_ui():
                         # Блоки дикторов
                         local_voices = get_local_voices()
                         voice_choices = ["-- Загрузить свой --"] + list(local_voices.keys())
+                        # Автовыбор случайных RU_ голосов для дикторов
+                        default_ru_voices = get_random_ru_voices(local_voices, 4)
 
                         speaker_blocks = []
                         speaker_audios = []
@@ -1383,10 +1404,11 @@ def build_ui():
                         for i in range(4):
                             with gr.Column(visible=(i < 2), elem_classes="speaker-block") as block:
                                 gr.Markdown(f"**Диктор {i}**")
+                                default_voice = default_ru_voices[i] if i < len(default_ru_voices) and default_ru_voices[i] else "-- Загрузить свой --"
                                 preset = gr.Dropdown(
                                     label="Пресет голоса",
                                     choices=voice_choices,
-                                    value=voice_choices[0] if len(voice_choices) > 0 else None,
+                                    value=default_voice,
                                 )
                                 audio = gr.Audio(
                                     label="Аудио референса",
@@ -1467,7 +1489,7 @@ def build_ui():
                             label="Сценарий диалога",
                             lines=10,
                             placeholder="Speaker 0: Привет!\nSpeaker 1: Привет, как дела?",
-                            value="Speaker 0: Привет! Ты уже попробовал новую модель Qwen3-TTS?\nSpeaker 1: Да, она отлично работает! Особенно впечатляет качество клонирования голоса.\nSpeaker 0: Согласен, результаты просто потрясающие!",
+                            value="Speaker 0: Привет! Ты уже подписался на канал нейро-софт?\nSpeaker 1: Да, там регулярно выходят портативные версии полезных нейросетей!\nSpeaker 0: Это точно, а еще классные мемы!",
                         )
 
                         with gr.Row():
@@ -1516,7 +1538,7 @@ def build_ui():
                             label="Текст для синтеза",
                             lines=4,
                             placeholder="Введите текст, который нужно озвучить...",
-                            value="Привет! Как твои дела? Это демонстрация синтеза речи."
+                            value="Привет! Как твои дела? Это демонстрация синтеза речи Qwen3-TTS от канала Нейро-софт."
                         )
 
                         vd_language = gr.Dropdown(
