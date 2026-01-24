@@ -214,6 +214,18 @@ xcopy /E /Y /Q downloads\voice-pack\* voices\
 rmdir /S /Q downloads\voice-pack
 echo Голосовой пакет установлен!
 
+echo [5.8/6] Установка SoX (аудио процессор)...
+if not exist "sox" (
+    echo Загрузка SoX...
+    curl -L -o downloads\sox.zip https://sourceforge.net/projects/sox/files/sox/14.4.2/sox-14.4.2-win32.zip/download
+    echo Распаковка SoX...
+    powershell -Command "Expand-Archive -Path 'downloads\sox.zip' -DestinationPath 'downloads' -Force"
+    move downloads\sox-14.4.2 sox
+    echo SoX установлен!
+) else (
+    echo SoX уже установлен, пропускаем...
+)
+
 echo [6/6] Финализация установки...
 REM Создаем конфигурационный файл с версией CUDA
 echo %CUDA_VERSION%> cuda_version.txt

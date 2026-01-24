@@ -76,6 +76,11 @@ REM =====================================================
 set PYTHONIOENCODING=utf-8
 set PYTHONUNBUFFERED=1
 
+REM Добавляем SoX в PATH
+if exist "%SCRIPT_DIR%sox" (
+    set "PATH=%SCRIPT_DIR%sox;%PATH%"
+)
+
 REM Запускаем приложение
 echo Запуск Qwen3-TTS...
 echo.
