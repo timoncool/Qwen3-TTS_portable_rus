@@ -1535,16 +1535,18 @@ def build_ui():
                         gr.Markdown("**Готовые промпты** (кликни для применения)")
                         gr.Examples(
                             examples=[
-                                ["Young female voice, warm and friendly, gentle smile"],
-                                ["Male voice, deep and authoritative, slow confident pace"],
-                                ["Energetic young man, enthusiastic and excited"],
-                                ["Elderly woman, soft caring voice, speaking slowly"],
-                                ["Professional news anchor, clear neutral tone"],
-                                ["Speak in an angry tone with strong emphasis"],
-                                ["Whisper softly, mysterious and secretive"],
-                                ["Child voice, playful and cheerful, high pitch"],
-                                ["Tired sleepy voice, slow and drowsy"],
-                                ["Speak with surprise and disbelief"],
+                                ["Female, 25 years old, warm soprano voice, speaking with a gentle smile and soft tone"],
+                                ["Male, 35 years old, deep baritone, confident and authoritative, measured pace"],
+                                ["Male, 17 years old, tenor range, gaining confidence - deeper breath support now"],
+                                ["Speak in an incredulous tone, but with a hint of panic beginning to creep into your voice"],
+                                ["Elderly woman, 70 years old, soft and caring, speaking slowly with wisdom and warmth"],
+                                ["Young child, 8 years old, playful and cheerful, high-pitched with innocent excitement"],
+                                ["Professional news anchor, clear articulation, neutral tone, moderate pace"],
+                                ["Speak with intense anger, sharp emphasis on words, aggressive tone"],
+                                ["Whisper softly with mystery, secretive and intimate, barely audible"],
+                                ["Exhausted and sleepy voice, slow drowsy delivery, yawning between words"],
+                                ["Speak with genuine surprise and disbelief, voice rising in pitch"],
+                                ["Seductive female voice, low and breathy, slow sensual pace"],
                             ],
                             inputs=[vd_description],
                             label=""
