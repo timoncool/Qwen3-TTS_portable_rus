@@ -1007,21 +1007,21 @@ def build_ui():
     }
 
     .settings-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(30, 41, 59, 0.95) !important;
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
     .generation-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(30, 41, 59, 0.95) !important;
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
     .speaker-block {
-        background: #f0f0f0;
+        background: #1e293b !important;
         border-radius: 10px;
         padding: 10px;
         margin: 5px 0;
@@ -1032,15 +1032,14 @@ def build_ui():
         padding: 0.75rem 1.5rem !important;
     }
 
-    /* Dark mode support */
-    .dark .settings-card, .dark .generation-card {
-        background: rgba(30, 41, 59, 0.95);
+    /* Исправление белых рамок */
+    .examples-table, .examples-table tbody, .examples-table tr, .examples-table td {
+        background: transparent !important;
+        border: none !important;
     }
-    .dark .main-header {
-        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
-    }
-    .dark .speaker-block {
-        background: #1e293b;
+
+    .prose {
+        color: #e2e8f0 !important;
     }
     """
 
@@ -1048,7 +1047,7 @@ def build_ui():
         font=[gr.themes.GoogleFont("Inter"), "Arial", "sans-serif"],
         primary_hue="indigo",
         secondary_hue="purple",
-    )
+    ).dark()
 
     with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
         # Заголовок
