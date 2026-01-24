@@ -297,30 +297,16 @@ CLOUD_VOICES_BASE_URL = "https://huggingface.co/datasets/Slait/russia_voices/res
 CLOUD_VOICES_CACHE: List[str] = []
 
 def get_cloud_voices_list() -> Tuple[List[str], str]:
-    """Получение списка голосов из облака через HuggingFace API."""
+    """Получение полного списка голосов из облака."""
     global CLOUD_VOICES_CACHE
-    import requests
+    from huggingface_hub import list_repo_files
 
     try:
-        # Получаем список файлов через HuggingFace API
-        api_url = f"https://huggingface.co/api/datasets/{CLOUD_VOICES_REPO}/tree/main"
-        response = requests.get(api_url, timeout=30)
-        response.raise_for_status()
-
-        files = response.json()
-        voices = set()
-
-        for file_info in files:
-            filename = file_info.get("path", "")
-            # Берём только mp3 файлы
-            if filename.endswith(".mp3"):
-                voice_name = filename[:-4]  # Убираем .mp3
-                voices.add(voice_name)
-
-        voice_list = sorted(list(voices))
+        files = list(list_repo_files(CLOUD_VOICES_REPO, repo_type="dataset"))
+        voices = [f[:-4] for f in files if f.endswith(".mp3")]
+        voice_list = sorted(voices)
         CLOUD_VOICES_CACHE = voice_list
         return voice_list, f"Найдено {len(voice_list)} голосов. Репозиторий: {CLOUD_VOICES_REPO}"
-
     except Exception as e:
         return [], f"Ошибка загрузки списка: {e}"
 
