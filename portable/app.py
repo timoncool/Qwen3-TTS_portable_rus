@@ -290,58 +290,91 @@ def delete_voice_profile(name: str) -> str:
 # Загрузка голосов из облака
 # =====================================================
 
-CLOUD_VOICES_REPO = "timoncool/qwen3-tts-voices"
+CLOUD_VOICES_REPO = "Slait/russia_voices"
+CLOUD_VOICES_BASE_URL = "https://huggingface.co/datasets/Slait/russia_voices/resolve/main"
+
+# Список всех доступных голосов (обновляется при загрузке)
+CLOUD_VOICES_CACHE: List[str] = []
 
 def get_cloud_voices_list() -> Tuple[List[str], str]:
     """Получение списка голосов из облака."""
-    try:
-        # Пробуем скачать index.json из репозитория
-        index_path = hf_hub_download(
-            repo_id=CLOUD_VOICES_REPO,
-            filename="index.json",
-            repo_type="dataset"
-        )
+    global CLOUD_VOICES_CACHE
 
-        with open(index_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    # Предзаданный список голосов (выборка популярных)
+    # Полный список можно получить через API HuggingFace
+    popular_voices = [
+        # Женские голоса
+        "RU_Female_abramova_oljga",
+        "RU_Female_aleksandrova_nina",
+        "RU_Female_andreeva_zinaida",
+        "RU_Female_artemova_yuliya",
+        "RU_Female_borisova_mariya",
+        "RU_Female_cherkasova_yuliya",
+        "RU_Female_danilova_nataljya",
+        "RU_Female_dmitrova_ekaterina",
+        "RU_Female_frolova_ekaterina",
+        "RU_Female_grishina_anna",
+        "RU_Female_ivanova_oljga",
+        "RU_Female_klimova_elizaveta",
+        "RU_Female_kuznecova_svetlana",
+        "RU_Female_morozova_elena",
+        "RU_Female_semenova_ekaterina",
+        "RU_Female_shitova_tatjyana",
+        "RU_Female_volkova_anna",
+        # Мужские голоса
+        "RU_Male_abdulov_vsevolod",
+        "RU_Male_alekseev_andrey",
+        "RU_Male_baranov_vladimir",
+        "RU_Male_burunov_sergey",
+        "RU_Male_chonishvili_sergey",
+        "RU_Male_dmitriev_kirill",
+        "RU_Male_frolov_sergey",
+        "RU_Male_ivanov_ivan",
+        "RU_Male_klyukvin_aleksandr",
+        "RU_Male_kuznecov_aleksey",
+        "RU_Male_lazarev_aleksey",
+        "RU_Male_morozov_aleksandr",
+        "RU_Male_petrov_viktor",
+        "RU_Male_smirnov_sergey",
+        "RU_Male_yarmoljnik_leonid",
+    ]
 
-        voices = [v["name"] for v in data.get("voices", [])]
-        return voices, f"Найдено {len(voices)} голосов в облаке."
-
-    except Exception as e:
-        return [], f"Ошибка получения списка голосов: {e}"
+    CLOUD_VOICES_CACHE = popular_voices
+    return popular_voices, f"Найдено {len(popular_voices)} популярных голосов. Репозиторий: {CLOUD_VOICES_REPO}"
 
 
 def download_cloud_voice(voice_name: str) -> str:
     """Загрузка голоса из облака."""
+    import requests
+
     try:
-        # Скачиваем аудио файл
-        audio_path = hf_hub_download(
-            repo_id=CLOUD_VOICES_REPO,
-            filename=f"voices/{voice_name}.wav",
-            repo_type="dataset"
-        )
+        # Скачиваем MP3 файл
+        mp3_url = f"{CLOUD_VOICES_BASE_URL}/{voice_name}.mp3?download=true"
+        txt_url = f"{CLOUD_VOICES_BASE_URL}/{voice_name}.txt?download=true"
 
-        # Копируем в локальную директорию
-        import shutil
-        dest_path = VOICES_DIR / f"{voice_name}.wav"
-        shutil.copy(audio_path, dest_path)
+        # Скачиваем аудио
+        response = requests.get(mp3_url, timeout=60, stream=True)
+        response.raise_for_status()
 
-        # Пробуем скачать текст (если есть)
+        mp3_path = VOICES_DIR / f"{voice_name}.mp3"
+        with open(mp3_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        # Пробуем скачать текст
         try:
-            text_path = hf_hub_download(
-                repo_id=CLOUD_VOICES_REPO,
-                filename=f"voices/{voice_name}.txt",
-                repo_type="dataset"
-            )
-            shutil.copy(text_path, VOICES_DIR / f"{voice_name}.txt")
+            txt_response = requests.get(txt_url, timeout=30)
+            if txt_response.status_code == 200:
+                txt_path = VOICES_DIR / f"{voice_name}.txt"
+                txt_path.write_text(txt_response.text, encoding="utf-8")
         except:
             pass
 
         return f"Голос '{voice_name}' успешно загружен!"
 
     except Exception as e:
-        return f"Ошибка загрузки голоса: {e}"
+        return f"Ошибка загрузки голоса '{voice_name}': {e}"
 
 
 # =====================================================
@@ -1668,27 +1701,6 @@ def build_ui():
                 )
                 vd_stop_btn.click(stop_generation_fn, outputs=[vd_status])
 
-        # Нижний колонтитул
-        gr.Markdown(f"""
----
-
-**{APP_NAME}** v{APP_VERSION} - Русскоязычная версия с Multi-speaker и профилями голосов
-
-Создано на основе [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) от Alibaba Qwen Team.
-
-### Авторы:
-
-**[Nerual Dreaming](https://t.me/nerual_dreming)** - база, основной код, основатель [ArtGeneration.me](https://artgeneration.me), техноблогер и нейро-евангелист.
-
----
-
-**Поддерживаемые языки:** Русский, Английский, Китайский, Японский, Корейский, Французский, Немецкий, Испанский, Португальский, Итальянский
-
-**Системные требования:**
-- GPU: минимум 8GB VRAM для модели 1.7B, 4GB для 0.6B
-- RAM: минимум 16GB
-- При первом запуске модели загружаются из интернета (~4-8GB)
-        """)
 
     return demo
 
