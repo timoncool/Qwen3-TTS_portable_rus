@@ -1210,6 +1210,16 @@ def build_ui():
                         # Выбор голоса из библиотеки
                         local_voices = get_local_voices()
                         first_ru_voice = get_first_ru_voice(local_voices)
+
+                        # Предзагрузка аудио и текста для дефолтного голоса
+                        default_vc_audio, default_vc_text = None, ""
+                        if first_ru_voice and first_ru_voice in local_voices:
+                            path = local_voices[first_ru_voice]
+                            import soundfile as sf
+                            wav, sr = sf.read(path)
+                            default_vc_audio = (sr, wav)
+                            default_vc_text = get_voice_text(first_ru_voice) or ""
+
                         vc_voice_preset = gr.Dropdown(
                             label="Выбрать голос из библиотеки",
                             choices=["-- Загрузить свой --"] + list(local_voices.keys()),
@@ -1222,11 +1232,13 @@ def build_ui():
                             label="Референсное аудио (голос для клонирования)",
                             type="numpy",
                             sources=["upload", "microphone"],
+                            value=default_vc_audio,
                         )
                         vc_ref_text = gr.Textbox(
                             label="Текст референсного аудио",
                             lines=2,
                             placeholder="Введите текст, который произносится в референсном аудио...",
+                            value=default_vc_text,
                         )
 
                         def load_voice_preset(voice_name):
@@ -1396,6 +1408,18 @@ def build_ui():
                         # Автовыбор случайных RU_ голосов для дикторов
                         default_ru_voices = get_random_ru_voices(local_voices, 4)
 
+                        # Предзагрузка аудио и текста для дефолтных голосов
+                        def load_default_voice_data(voice_name):
+                            if not voice_name or voice_name == "-- Загрузить свой --":
+                                return None, ""
+                            path = local_voices.get(voice_name)
+                            if path:
+                                import soundfile as sf
+                                wav, sr = sf.read(path)
+                                ref_text = get_voice_text(voice_name) or ""
+                                return (sr, wav), ref_text
+                            return None, ""
+
                         speaker_blocks = []
                         speaker_audios = []
                         speaker_texts = []
@@ -1405,6 +1429,7 @@ def build_ui():
                             with gr.Column(visible=(i < 2), elem_classes="speaker-block") as block:
                                 gr.Markdown(f"**Диктор {i}**")
                                 default_voice = default_ru_voices[i] if i < len(default_ru_voices) and default_ru_voices[i] else "-- Загрузить свой --"
+                                default_audio, default_text = load_default_voice_data(default_voice)
                                 preset = gr.Dropdown(
                                     label="Пресет голоса",
                                     choices=voice_choices,
@@ -1414,11 +1439,13 @@ def build_ui():
                                     label="Аудио референса",
                                     type="numpy",
                                     sources=["upload", "microphone"],
+                                    value=default_audio,
                                 )
                                 text = gr.Textbox(
                                     label="Текст референса (опционально)",
                                     lines=1,
                                     placeholder="Текст произносимый в аудио...",
+                                    value=default_text,
                                 )
 
                                 # Обработчик выбора пресета
