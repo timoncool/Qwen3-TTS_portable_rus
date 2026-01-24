@@ -1047,9 +1047,20 @@ def build_ui():
         font=[gr.themes.GoogleFont("Inter"), "Arial", "sans-serif"],
         primary_hue="indigo",
         secondary_hue="purple",
-    ).dark()
+    )
 
-    with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
+    # Темная тема по умолчанию
+    js = """
+    () => {
+        const url = new URL(window.location);
+        if (url.searchParams.get('__theme') !== 'dark') {
+            url.searchParams.set('__theme', 'dark');
+            window.location.href = url.href;
+        }
+    }
+    """
+
+    with gr.Blocks(theme=theme, css=css, title=APP_NAME, js=js) as demo:
         # Заголовок
         gr.HTML(f"""
         <div class="main-header">
