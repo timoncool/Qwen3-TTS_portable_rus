@@ -206,17 +206,11 @@ if "%GPU_CHOICE%"=="6" (
 echo.
 
 echo [5.7/6] Загрузка голосового пакета...
-if exist "voices\voice-pack-installed.txt" goto skip_voicepack
-
 echo Загрузка voice-pack.zip из HuggingFace...
 curl -L -o downloads\voice-pack.zip https://huggingface.co/datasets/nerualdreming/VibeVoice/resolve/main/voice-pack.zip
-
 echo Распаковка голосового пакета...
 powershell -Command "Expand-Archive -Path 'downloads\voice-pack.zip' -DestinationPath 'voices' -Force"
-echo installed> voices\voice-pack-installed.txt
 echo Голосовой пакет установлен!
-
-:skip_voicepack
 
 echo [6/6] Финализация установки...
 REM Создаем конфигурационный файл с версией CUDA
