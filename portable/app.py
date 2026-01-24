@@ -1469,6 +1469,7 @@ def build_ui():
             with gr.Tab("Дизайн голоса", id="design"):
                 gr.Markdown("### Создание голоса по текстовому описанию")
                 gr.Markdown("*Доступно только для модели 1.7B*")
+                gr.Markdown("**Примечание:** Описание голоса можно писать на русском, но на английском результат лучше.")
 
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="settings-card"):
@@ -1476,7 +1477,7 @@ def build_ui():
                             label="Текст для синтеза",
                             lines=4,
                             placeholder="Введите текст, который нужно озвучить...",
-                            value="Это невероятно! Я не могу поверить, что это действительно работает!"
+                            value="Привет! Как твои дела? Это демонстрация синтеза речи."
                         )
 
                         vd_language = gr.Dropdown(
@@ -1487,10 +1488,10 @@ def build_ui():
                         )
 
                         vd_description = gr.Textbox(
-                            label="Описание голоса",
+                            label="Описание голоса (лучше на английском)",
                             lines=3,
-                            placeholder="Опишите желаемый голос и стиль речи...",
-                            value="Говорить с удивлением и восторгом, голос молодой женщины, энергичный и выразительный."
+                            placeholder="Young female voice, warm and friendly...",
+                            value="Young female voice, warm and friendly, speaking with enthusiasm"
                         )
 
                         vd_model_size = gr.Dropdown(
@@ -1528,6 +1529,27 @@ def build_ui():
                             label="Статус",
                             lines=4,
                             interactive=False,
+                        )
+
+                        # Примеры промптов
+                        gr.Markdown("**Готовые промпты** (кликни для применения)")
+                        gr.Examples(
+                            examples=[
+                                ["Female, 25 years old, warm soprano voice, speaking with a gentle smile and soft tone"],
+                                ["Male, 35 years old, deep baritone, confident and authoritative, measured pace"],
+                                ["Male, 17 years old, tenor range, gaining confidence - deeper breath support now"],
+                                ["Speak in an incredulous tone, but with a hint of panic beginning to creep into your voice"],
+                                ["Elderly woman, 70 years old, soft and caring, speaking slowly with wisdom and warmth"],
+                                ["Young child, 8 years old, playful and cheerful, high-pitched with innocent excitement"],
+                                ["Professional news anchor, clear articulation, neutral tone, moderate pace"],
+                                ["Speak with intense anger, sharp emphasis on words, aggressive tone"],
+                                ["Whisper softly with mystery, secretive and intimate, barely audible"],
+                                ["Exhausted and sleepy voice, slow drowsy delivery, yawning between words"],
+                                ["Speak with genuine surprise and disbelief, voice rising in pitch"],
+                                ["Seductive female voice, low and breathy, slow sensual pace"],
+                            ],
+                            inputs=[vd_description],
+                            label=""
                         )
 
                 vd_generate_btn.click(
