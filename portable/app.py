@@ -1,23 +1,32 @@
 # coding=utf-8
 """
-Qwen3-TTS Portable - Русскоязычная версия со стримингом
+Qwen3-TTS Portable PRO - Русскоязычная версия со стримингом
 Синтез речи с поддержкой: Дизайн голоса, Клонирование голоса, Пресеты голосов
+Multi-speaker режим, профили голосов, загрузка из облака
+
+Авторы:
+@nerual_dreming - база, основной код, основатель ArtGeneration.me
 """
 
 import os
 import sys
 import time
+import json
 import threading
 import tempfile
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Iterator
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+import pickle
+import hashlib
 
 import gradio as gr
 import numpy as np
 import torch
 import soundfile as sf
-from huggingface_hub import snapshot_download
+from huggingface_hub import snapshot_download, hf_hub_download
 
 # Добавляем родительскую директорию для импорта qwen_tts
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,11 +34,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from qwen_tts import Qwen3TTSModel, VoiceClonePromptItem
 
 # =====================================================
+# Константы и конфигурация
+# =====================================================
+
+APP_VERSION = "2.0.0"
+APP_NAME = "Qwen3-TTS Portable PRO"
+
+# Директории
+SCRIPT_DIR = Path(__file__).parent
+VOICES_DIR = SCRIPT_DIR / "voices"
+PROFILES_DIR = SCRIPT_DIR / "profiles"
+OUTPUT_DIR = SCRIPT_DIR / "output"
+CONFIG_FILE = SCRIPT_DIR / "config.json"
+
+# Создаем директории
+VOICES_DIR.mkdir(exist_ok=True)
+PROFILES_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+# =====================================================
 # Глобальные переменные
 # =====================================================
 
 # Загруженные модели (кэш)
 loaded_models: Dict[tuple, Qwen3TTSModel] = {}
+
+# Кэш профилей голосов
+voice_profiles_cache: Dict[str, VoiceClonePromptItem] = {}
 
 # Флаги для стриминга
 is_generating = False
@@ -72,6 +103,279 @@ LANGUAGES = {
     "Portuguese": "Португальский",
     "Italian": "Итальянский"
 }
+
+# =====================================================
+# Конфигурация приложения
+# =====================================================
+
+@dataclass
+class AppConfig:
+    """Конфигурация приложения."""
+    default_model_size: str = "1.7B"
+    default_language: str = "Russian"
+    max_tokens: int = 2048
+    temperature: float = 0.7
+    top_p: float = 0.9
+    auto_save_audio: bool = True
+    theme: str = "soft"
+
+    @classmethod
+    def load(cls) -> "AppConfig":
+        """Загрузка конфигурации из файла."""
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return cls(**data)
+            except Exception as e:
+                print(f"Ошибка загрузки конфигурации: {e}")
+        return cls()
+
+    def save(self):
+        """Сохранение конфигурации в файл."""
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(asdict(self), f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Ошибка сохранения конфигурации: {e}")
+
+
+# Глобальная конфигурация
+app_config = AppConfig.load()
+
+# =====================================================
+# Профили голосов
+# =====================================================
+
+@dataclass
+class VoiceProfile:
+    """Профиль голоса для сохранения и загрузки."""
+    name: str
+    description: str = ""
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    ref_text: Optional[str] = None
+    x_vector_only_mode: bool = False
+    audio_hash: str = ""  # хэш референсного аудио
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "VoiceProfile":
+        return cls(**data)
+
+
+def get_audio_hash(audio_data: np.ndarray) -> str:
+    """Получение хэша аудио данных."""
+    return hashlib.md5(audio_data.tobytes()).hexdigest()[:16]
+
+
+def save_voice_profile(
+    name: str,
+    description: str,
+    ref_audio: Tuple[np.ndarray, int],
+    ref_text: Optional[str],
+    x_vector_only: bool,
+    model_size: str
+) -> str:
+    """Сохранение профиля голоса."""
+    try:
+        wav, sr = ref_audio
+        audio_hash = get_audio_hash(wav)
+
+        # Создаем профиль
+        profile = VoiceProfile(
+            name=name,
+            description=description,
+            ref_text=ref_text,
+            x_vector_only_mode=x_vector_only,
+            audio_hash=audio_hash
+        )
+
+        # Получаем модель для создания voice clone prompt
+        tts = get_model("Base", model_size)
+
+        # Создаем VoiceClonePromptItem
+        voice_prompt = tts.create_voice_clone_prompt(
+            ref_audio=(wav, sr),
+            ref_text=ref_text,
+            x_vector_only_mode=x_vector_only
+        )
+
+        # Сохраняем данные
+        profile_dir = PROFILES_DIR / name
+        profile_dir.mkdir(exist_ok=True)
+
+        # Сохраняем метаданные
+        with open(profile_dir / "profile.json", "w", encoding="utf-8") as f:
+            json.dump(profile.to_dict(), f, ensure_ascii=False, indent=2)
+
+        # Сохраняем аудио
+        sf.write(profile_dir / "reference.wav", wav, sr)
+
+        # Сохраняем voice prompt (тензоры)
+        torch.save({
+            "ref_code": voice_prompt.ref_code,
+            "ref_spk_embedding": voice_prompt.ref_spk_embedding,
+            "x_vector_only_mode": voice_prompt.x_vector_only_mode,
+            "icl_mode": voice_prompt.icl_mode,
+            "ref_text": voice_prompt.ref_text
+        }, profile_dir / "voice_prompt.pt")
+
+        # Обновляем кэш
+        voice_profiles_cache[name] = voice_prompt
+
+        return f"Профиль '{name}' успешно сохранён!"
+
+    except Exception as e:
+        return f"Ошибка сохранения профиля: {e}"
+
+
+def load_voice_profile(name: str) -> Tuple[Optional[VoiceClonePromptItem], str]:
+    """Загрузка профиля голоса."""
+    try:
+        # Проверяем кэш
+        if name in voice_profiles_cache:
+            return voice_profiles_cache[name], f"Профиль '{name}' загружен из кэша."
+
+        profile_dir = PROFILES_DIR / name
+        if not profile_dir.exists():
+            return None, f"Профиль '{name}' не найден."
+
+        # Загружаем voice prompt
+        data = torch.load(profile_dir / "voice_prompt.pt", map_location="cpu")
+
+        voice_prompt = VoiceClonePromptItem(
+            ref_code=data["ref_code"],
+            ref_spk_embedding=data["ref_spk_embedding"],
+            x_vector_only_mode=data["x_vector_only_mode"],
+            icl_mode=data["icl_mode"],
+            ref_text=data.get("ref_text")
+        )
+
+        # Сохраняем в кэш
+        voice_profiles_cache[name] = voice_prompt
+
+        return voice_prompt, f"Профиль '{name}' успешно загружен!"
+
+    except Exception as e:
+        return None, f"Ошибка загрузки профиля: {e}"
+
+
+def list_voice_profiles() -> List[str]:
+    """Получение списка сохранённых профилей."""
+    profiles = []
+    for path in PROFILES_DIR.iterdir():
+        if path.is_dir() and (path / "profile.json").exists():
+            profiles.append(path.name)
+    return sorted(profiles)
+
+
+def delete_voice_profile(name: str) -> str:
+    """Удаление профиля голоса."""
+    try:
+        import shutil
+        profile_dir = PROFILES_DIR / name
+        if profile_dir.exists():
+            shutil.rmtree(profile_dir)
+            if name in voice_profiles_cache:
+                del voice_profiles_cache[name]
+            return f"Профиль '{name}' удалён."
+        return f"Профиль '{name}' не найден."
+    except Exception as e:
+        return f"Ошибка удаления профиля: {e}"
+
+
+# =====================================================
+# Загрузка голосов из облака
+# =====================================================
+
+CLOUD_VOICES_REPO = "Slait/russia_voices"
+CLOUD_VOICES_BASE_URL = "https://huggingface.co/datasets/Slait/russia_voices/resolve/main"
+
+# Список всех доступных голосов (обновляется при загрузке)
+CLOUD_VOICES_CACHE: List[str] = []
+
+def get_cloud_voices_list() -> Tuple[List[str], str]:
+    """Получение списка голосов из облака."""
+    global CLOUD_VOICES_CACHE
+
+    # Предзаданный список голосов (выборка популярных)
+    # Полный список можно получить через API HuggingFace
+    popular_voices = [
+        # Женские голоса
+        "RU_Female_abramova_oljga",
+        "RU_Female_aleksandrova_nina",
+        "RU_Female_andreeva_zinaida",
+        "RU_Female_artemova_yuliya",
+        "RU_Female_borisova_mariya",
+        "RU_Female_cherkasova_yuliya",
+        "RU_Female_danilova_nataljya",
+        "RU_Female_dmitrova_ekaterina",
+        "RU_Female_frolova_ekaterina",
+        "RU_Female_grishina_anna",
+        "RU_Female_ivanova_oljga",
+        "RU_Female_klimova_elizaveta",
+        "RU_Female_kuznecova_svetlana",
+        "RU_Female_morozova_elena",
+        "RU_Female_semenova_ekaterina",
+        "RU_Female_shitova_tatjyana",
+        "RU_Female_volkova_anna",
+        # Мужские голоса
+        "RU_Male_abdulov_vsevolod",
+        "RU_Male_alekseev_andrey",
+        "RU_Male_baranov_vladimir",
+        "RU_Male_burunov_sergey",
+        "RU_Male_chonishvili_sergey",
+        "RU_Male_dmitriev_kirill",
+        "RU_Male_frolov_sergey",
+        "RU_Male_ivanov_ivan",
+        "RU_Male_klyukvin_aleksandr",
+        "RU_Male_kuznecov_aleksey",
+        "RU_Male_lazarev_aleksey",
+        "RU_Male_morozov_aleksandr",
+        "RU_Male_petrov_viktor",
+        "RU_Male_smirnov_sergey",
+        "RU_Male_yarmoljnik_leonid",
+    ]
+
+    CLOUD_VOICES_CACHE = popular_voices
+    return popular_voices, f"Найдено {len(popular_voices)} популярных голосов. Репозиторий: {CLOUD_VOICES_REPO}"
+
+
+def download_cloud_voice(voice_name: str) -> str:
+    """Загрузка голоса из облака."""
+    import requests
+
+    try:
+        # Скачиваем MP3 файл
+        mp3_url = f"{CLOUD_VOICES_BASE_URL}/{voice_name}.mp3?download=true"
+        txt_url = f"{CLOUD_VOICES_BASE_URL}/{voice_name}.txt?download=true"
+
+        # Скачиваем аудио
+        response = requests.get(mp3_url, timeout=60, stream=True)
+        response.raise_for_status()
+
+        mp3_path = VOICES_DIR / f"{voice_name}.mp3"
+        with open(mp3_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        # Пробуем скачать текст
+        try:
+            txt_response = requests.get(txt_url, timeout=30)
+            if txt_response.status_code == 200:
+                txt_path = VOICES_DIR / f"{voice_name}.txt"
+                txt_path.write_text(txt_response.text, encoding="utf-8")
+        except:
+            pass
+
+        return f"Голос '{voice_name}' успешно загружен!"
+
+    except Exception as e:
+        return f"Ошибка загрузки голоса '{voice_name}': {e}"
+
 
 # =====================================================
 # Вспомогательные функции
@@ -167,14 +471,60 @@ def audio_to_tuple(audio) -> Optional[Tuple[np.ndarray, int]]:
     return None
 
 
-def save_audio_file(audio_data: np.ndarray, sample_rate: int, output_dir: str = "output") -> str:
+def save_audio_file(audio_data: np.ndarray, sample_rate: int, output_dir: str = None) -> str:
     """Сохранение аудио в файл."""
+    if output_dir is None:
+        output_dir = str(OUTPUT_DIR)
     os.makedirs(output_dir, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     filename = f"qwen3_tts_{timestamp}.wav"
     filepath = os.path.join(output_dir, filename)
     sf.write(filepath, audio_data, sample_rate)
     return filepath
+
+
+# =====================================================
+# Multi-speaker парсер
+# =====================================================
+
+def parse_multi_speaker_script(script: str) -> List[Tuple[int, str]]:
+    """
+    Парсинг скрипта с несколькими дикторами.
+    Формат: "Speaker N: текст" или "Диктор N: текст"
+
+    Возвращает список кортежей (speaker_id, text)
+    """
+    lines = script.strip().split('\n')
+    result = []
+
+    # Паттерны для парсинга
+    patterns = [
+        r'^Speaker\s*(\d+)\s*:\s*(.+)$',
+        r'^Диктор\s*(\d+)\s*:\s*(.+)$',
+        r'^Голос\s*(\d+)\s*:\s*(.+)$',
+        r'^\[(\d+)\]\s*(.+)$',
+    ]
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        matched = False
+        for pattern in patterns:
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                speaker_id = int(match.group(1))
+                text = match.group(2).strip()
+                result.append((speaker_id, text))
+                matched = True
+                break
+
+        if not matched:
+            # Если формат не распознан, добавляем к Speaker 0
+            result.append((0, line))
+
+    return result
 
 
 # =====================================================
@@ -337,6 +687,85 @@ def generate_voice_clone(
         is_generating = False
 
 
+def generate_with_profile(
+    profile_name: str,
+    target_text: str,
+    language: str,
+    model_size: str,
+    max_tokens: int,
+    temperature: float,
+    top_p: float
+) -> Iterator[Tuple[Optional[Tuple[int, np.ndarray]], str]]:
+    """Генерация с использованием сохранённого профиля голоса."""
+    global is_generating, stop_generation
+
+    if not target_text or not target_text.strip():
+        yield None, "Ошибка: Введите текст для синтеза."
+        return
+
+    if not profile_name:
+        yield None, "Ошибка: Выберите профиль голоса."
+        return
+
+    is_generating = True
+    stop_generation = False
+
+    try:
+        yield None, f"Загрузка профиля '{profile_name}'..."
+        voice_prompt, load_msg = load_voice_profile(profile_name)
+
+        if voice_prompt is None:
+            yield None, load_msg
+            return
+
+        yield None, "Загрузка модели Base..."
+        tts = get_model("Base", model_size)
+
+        yield None, f"Генерация с профилем '{profile_name}'...\nТекст: {target_text[:50]}..."
+
+        # Получаем реальный код языка
+        lang_code = "Auto"
+        for code, name in LANGUAGES.items():
+            if name == language:
+                lang_code = code
+                break
+
+        start_time = time.time()
+
+        wavs, sr = tts.generate_voice_clone(
+            text=target_text.strip(),
+            language=lang_code,
+            voice_clone_prompt=voice_prompt,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+        )
+
+        if stop_generation:
+            is_generating = False
+            yield None, "Генерация остановлена пользователем."
+            return
+
+        generation_time = time.time() - start_time
+        audio_duration = len(wavs[0]) / sr
+
+        # Сохраняем файл
+        saved_path = save_audio_file(wavs[0], sr)
+
+        status = f"Генерация завершена!\n"
+        status += f"Профиль: {profile_name}\n"
+        status += f"Время генерации: {generation_time:.2f} сек\n"
+        status += f"Длительность аудио: {audio_duration:.2f} сек\n"
+        status += f"Файл сохранен: {saved_path}"
+
+        yield (sr, wavs[0]), status
+
+    except Exception as e:
+        yield None, f"Ошибка: {type(e).__name__}: {e}"
+    finally:
+        is_generating = False
+
+
 def generate_custom_voice(
     text: str,
     language: str,
@@ -417,11 +846,161 @@ def generate_custom_voice(
         is_generating = False
 
 
+def generate_multi_speaker(
+    script: str,
+    num_speakers: int,
+    speaker_audios: List,
+    speaker_texts: List[str],
+    language: str,
+    model_size: str,
+    max_tokens: int,
+    temperature: float,
+    top_p: float
+) -> Iterator[Tuple[Optional[Tuple[int, np.ndarray]], str]]:
+    """Генерация диалога с несколькими дикторами."""
+    global is_generating, stop_generation
+
+    if not script or not script.strip():
+        yield None, "Ошибка: Введите сценарий диалога."
+        return
+
+    # Парсим скрипт
+    parsed_lines = parse_multi_speaker_script(script)
+    if not parsed_lines:
+        yield None, "Ошибка: Не удалось распознать формат сценария."
+        return
+
+    # Проверяем, что все дикторы имеют аудио
+    used_speakers = set(sp for sp, _ in parsed_lines)
+    for sp in used_speakers:
+        if sp >= num_speakers:
+            yield None, f"Ошибка: В сценарии используется Диктор {sp}, но настроено только {num_speakers} дикторов."
+            return
+        audio = speaker_audios[sp] if sp < len(speaker_audios) else None
+        if audio_to_tuple(audio) is None:
+            yield None, f"Ошибка: Не загружено аудио для Диктора {sp}."
+            return
+
+    is_generating = True
+    stop_generation = False
+
+    try:
+        yield None, "Загрузка модели Base..."
+        tts = get_model("Base", model_size)
+
+        # Получаем реальный код языка
+        lang_code = "Auto"
+        for code, name in LANGUAGES.items():
+            if name == language:
+                lang_code = code
+                break
+
+        # Создаём voice prompts для каждого диктора
+        yield None, "Создание профилей голосов для дикторов..."
+        voice_prompts = {}
+        for sp in used_speakers:
+            audio_tuple = audio_to_tuple(speaker_audios[sp])
+            ref_text = speaker_texts[sp] if sp < len(speaker_texts) else None
+
+            voice_prompts[sp] = tts.create_voice_clone_prompt(
+                ref_audio=audio_tuple,
+                ref_text=ref_text.strip() if ref_text else None,
+                x_vector_only_mode=not bool(ref_text)
+            )
+
+        # Генерируем аудио для каждой реплики
+        all_audio_chunks = []
+        total_lines = len(parsed_lines)
+        sample_rate = None
+
+        start_time = time.time()
+
+        for i, (speaker_id, text) in enumerate(parsed_lines):
+            if stop_generation:
+                is_generating = False
+                yield None, "Генерация остановлена пользователем."
+                return
+
+            yield None, f"Генерация реплики {i+1}/{total_lines}...\nДиктор {speaker_id}: {text[:30]}..."
+
+            wavs, sr = tts.generate_voice_clone(
+                text=text,
+                language=lang_code,
+                voice_clone_prompt=voice_prompts[speaker_id],
+                max_new_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+            )
+
+            if sample_rate is None:
+                sample_rate = sr
+
+            all_audio_chunks.append(wavs[0])
+
+            # Добавляем паузу между репликами
+            pause_samples = int(0.3 * sr)  # 300ms пауза
+            all_audio_chunks.append(np.zeros(pause_samples, dtype=np.float32))
+
+        if stop_generation:
+            is_generating = False
+            yield None, "Генерация остановлена пользователем."
+            return
+
+        # Объединяем все аудио
+        final_audio = np.concatenate(all_audio_chunks)
+
+        generation_time = time.time() - start_time
+        audio_duration = len(final_audio) / sample_rate
+
+        # Сохраняем файл
+        saved_path = save_audio_file(final_audio, sample_rate)
+
+        status = f"Multi-speaker генерация завершена!\n"
+        status += f"Дикторов: {len(used_speakers)}\n"
+        status += f"Реплик: {total_lines}\n"
+        status += f"Время генерации: {generation_time:.2f} сек\n"
+        status += f"Длительность аудио: {audio_duration:.2f} сек\n"
+        status += f"Файл сохранен: {saved_path}"
+
+        yield (sample_rate, final_audio), status
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        yield None, f"Ошибка: {type(e).__name__}: {e}"
+    finally:
+        is_generating = False
+
+
 def stop_generation_fn():
     """Остановка генерации."""
     global stop_generation
     stop_generation = True
     return "Остановка генерации..."
+
+
+# =====================================================
+# Локальные голоса
+# =====================================================
+
+def get_local_voices() -> Dict[str, str]:
+    """Получение списка локальных голосов."""
+    voices = {}
+    supported_ext = ('.wav', '.mp3', '.flac', '.ogg', '.m4a')
+
+    for path in VOICES_DIR.iterdir():
+        if path.is_file() and path.suffix.lower() in supported_ext:
+            voices[path.stem] = str(path)
+
+    return dict(sorted(voices.items()))
+
+
+def get_voice_text(voice_name: str) -> Optional[str]:
+    """Получение текста для голоса (если есть)."""
+    txt_path = VOICES_DIR / f"{voice_name}.txt"
+    if txt_path.exists():
+        return txt_path.read_text(encoding="utf-8").strip()
+    return None
 
 
 # =====================================================
@@ -431,7 +1010,7 @@ def stop_generation_fn():
 def build_ui():
     """Построение интерфейса Gradio."""
 
-    # CSS стили (взято из VibeVoice)
+    # CSS стили
     css = """
     .gradio-container {max-width: none !important;}
 
@@ -468,6 +1047,13 @@ def build_ui():
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
 
+    .speaker-block {
+        background: #f0f0f0;
+        border-radius: 10px;
+        padding: 10px;
+        margin: 5px 0;
+    }
+
     .tab-nav button {
         font-size: 1rem !important;
         padding: 0.75rem 1.5rem !important;
@@ -480,6 +1066,9 @@ def build_ui():
     .dark .main-header {
         background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
     }
+    .dark .speaker-block {
+        background: #1e293b;
+    }
     """
 
     theme = gr.themes.Soft(
@@ -488,12 +1077,17 @@ def build_ui():
         secondary_hue="purple",
     )
 
-    with gr.Blocks(theme=theme, css=css, title="Qwen3-TTS Portable") as demo:
+    with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
         # Заголовок
-        gr.HTML("""
+        gr.HTML(f"""
         <div class="main-header">
-            <h1>Qwen3-TTS - Синтез речи</h1>
-            <p>Портативная русскоязычная версия со стримингом</p>
+            <h1>{APP_NAME} v{APP_VERSION}</h1>
+            <p>Синтез речи с Multi-speaker режимом и профилями голосов</p>
+            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem;">
+                Собрал <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">Nerual Dreaming</a> -
+                основатель <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>,
+                техноблогер и нейро-евангелист.
+            </p>
         </div>
         """)
 
@@ -653,6 +1247,19 @@ def build_ui():
                             interactive=False,
                         )
 
+                        # Сохранение профиля
+                        with gr.Accordion("Сохранить как профиль", open=False):
+                            vc_profile_name = gr.Textbox(
+                                label="Название профиля",
+                                placeholder="Мой голос",
+                            )
+                            vc_profile_desc = gr.Textbox(
+                                label="Описание (опционально)",
+                                placeholder="Описание голоса...",
+                            )
+                            vc_save_profile_btn = gr.Button("Сохранить профиль", variant="secondary")
+                            vc_save_status = gr.Textbox(label="Статус сохранения", interactive=False)
+
                 vc_generate_btn.click(
                     generate_voice_clone,
                     inputs=[vc_ref_audio, vc_ref_text, vc_target_text, vc_language, vc_xvector_only, vc_model_size, vc_max_tokens, vc_temperature, vc_top_p],
@@ -660,8 +1267,368 @@ def build_ui():
                 )
                 vc_stop_btn.click(stop_generation_fn, outputs=[vc_status])
 
+                def save_profile_handler(name, desc, ref_audio, ref_text, xvector_only, model_size):
+                    if not name:
+                        return "Ошибка: Введите название профиля."
+                    audio_tuple = audio_to_tuple(ref_audio)
+                    if audio_tuple is None:
+                        return "Ошибка: Загрузите референсное аудио."
+                    return save_voice_profile(name, desc, audio_tuple, ref_text, xvector_only, model_size)
+
+                vc_save_profile_btn.click(
+                    save_profile_handler,
+                    inputs=[vc_profile_name, vc_profile_desc, vc_ref_audio, vc_ref_text, vc_xvector_only, vc_model_size],
+                    outputs=[vc_save_status],
+                )
+
             # =====================================================
-            # Вкладка 3: Дизайн голоса (VoiceDesign)
+            # Вкладка 3: Профили голосов
+            # =====================================================
+            with gr.Tab("Профили голосов", id="profiles"):
+                gr.Markdown("### Генерация с сохранёнными профилями голосов")
+                gr.Markdown("*Сохраните профиль на вкладке 'Клонирование голоса' для быстрого повторного использования*")
+
+                with gr.Row():
+                    with gr.Column(scale=1, elem_classes="settings-card"):
+                        def refresh_profiles():
+                            return gr.update(choices=list_voice_profiles())
+
+                        pf_profile = gr.Dropdown(
+                            label="Выберите профиль",
+                            choices=list_voice_profiles(),
+                            interactive=True,
+                        )
+                        pf_refresh_btn = gr.Button("Обновить список", size="sm")
+                        pf_refresh_btn.click(refresh_profiles, outputs=[pf_profile])
+
+                        pf_text = gr.Textbox(
+                            label="Текст для синтеза",
+                            lines=4,
+                            placeholder="Введите текст для озвучки...",
+                        )
+
+                        with gr.Row():
+                            pf_language = gr.Dropdown(
+                                label="Язык",
+                                choices=list(LANGUAGES.values()),
+                                value=LANGUAGES["Auto"],
+                                interactive=True,
+                            )
+                            pf_model_size = gr.Dropdown(
+                                label="Размер модели",
+                                choices=MODEL_SIZES,
+                                value="1.7B",
+                                interactive=True,
+                            )
+
+                        with gr.Accordion("Параметры генерации", open=False):
+                            pf_max_tokens = gr.Slider(
+                                label="Макс. токенов",
+                                minimum=256, maximum=4096, value=2048, step=256
+                            )
+                            pf_temperature = gr.Slider(
+                                label="Температура",
+                                minimum=0.1, maximum=2.0, value=0.7, step=0.1
+                            )
+                            pf_top_p = gr.Slider(
+                                label="Top-P",
+                                minimum=0.1, maximum=1.0, value=0.9, step=0.05
+                            )
+
+                        with gr.Row():
+                            pf_generate_btn = gr.Button("Сгенерировать", variant="primary", scale=2)
+                            pf_stop_btn = gr.Button("Стоп", variant="stop", scale=1)
+
+                        with gr.Accordion("Управление профилями", open=False):
+                            pf_delete_btn = gr.Button("Удалить выбранный профиль", variant="stop")
+                            pf_delete_status = gr.Textbox(label="Статус", interactive=False)
+
+                            def delete_profile_handler(name):
+                                if not name:
+                                    return "Выберите профиль для удаления."
+                                return delete_voice_profile(name)
+
+                            pf_delete_btn.click(
+                                delete_profile_handler,
+                                inputs=[pf_profile],
+                                outputs=[pf_delete_status],
+                            ).then(refresh_profiles, outputs=[pf_profile])
+
+                    with gr.Column(scale=1, elem_classes="generation-card"):
+                        pf_audio_out = gr.Audio(
+                            label="Результат",
+                            type="numpy",
+                            interactive=False,
+                        )
+                        pf_status = gr.Textbox(
+                            label="Статус",
+                            lines=4,
+                            interactive=False,
+                        )
+
+                pf_generate_btn.click(
+                    generate_with_profile,
+                    inputs=[pf_profile, pf_text, pf_language, pf_model_size, pf_max_tokens, pf_temperature, pf_top_p],
+                    outputs=[pf_audio_out, pf_status],
+                )
+                pf_stop_btn.click(stop_generation_fn, outputs=[pf_status])
+
+            # =====================================================
+            # Вкладка 4: Multi-speaker
+            # =====================================================
+            with gr.Tab("Multi-speaker", id="multi"):
+                gr.Markdown("### Генерация диалога с несколькими дикторами")
+                gr.Markdown("""
+                **Формат сценария:**
+                ```
+                Speaker 0: Привет, как дела?
+                Speaker 1: Отлично, спасибо! А у тебя?
+                Speaker 0: Тоже хорошо!
+                ```
+                Также поддерживаются форматы: `Диктор N:`, `Голос N:`, `[N]`
+                """)
+
+                with gr.Row():
+                    with gr.Column(scale=1, elem_classes="settings-card"):
+                        ms_num_speakers = gr.Slider(
+                            label="Количество дикторов",
+                            minimum=2, maximum=4, value=2, step=1,
+                        )
+
+                        # Блоки дикторов
+                        local_voices = get_local_voices()
+                        voice_choices = ["-- Загрузить свой --"] + list(local_voices.keys())
+
+                        speaker_blocks = []
+                        speaker_audios = []
+                        speaker_texts = []
+                        speaker_presets = []
+
+                        for i in range(4):
+                            with gr.Column(visible=(i < 2), elem_classes="speaker-block") as block:
+                                gr.Markdown(f"**Диктор {i}**")
+                                preset = gr.Dropdown(
+                                    label="Пресет голоса",
+                                    choices=voice_choices,
+                                    value=voice_choices[0] if len(voice_choices) > 0 else None,
+                                )
+                                audio = gr.Audio(
+                                    label="Аудио референса",
+                                    type="numpy",
+                                    sources=["upload", "microphone"],
+                                )
+                                text = gr.Textbox(
+                                    label="Текст референса (опционально)",
+                                    lines=1,
+                                    placeholder="Текст произносимый в аудио...",
+                                )
+
+                                # Обработчик выбора пресета
+                                def update_from_preset(preset_name, idx=i):
+                                    if preset_name == "-- Загрузить свой --":
+                                        return gr.update(value=None), gr.update(value="")
+                                    path = local_voices.get(preset_name)
+                                    if path:
+                                        import soundfile as sf
+                                        wav, sr = sf.read(path)
+                                        ref_text = get_voice_text(preset_name) or ""
+                                        return gr.update(value=(sr, wav)), gr.update(value=ref_text)
+                                    return gr.update(value=None), gr.update(value="")
+
+                                preset.change(
+                                    update_from_preset,
+                                    inputs=[preset],
+                                    outputs=[audio, text],
+                                )
+
+                                speaker_blocks.append(block)
+                                speaker_audios.append(audio)
+                                speaker_texts.append(text)
+                                speaker_presets.append(preset)
+
+                        # Обновление видимости блоков
+                        def update_speaker_visibility(num):
+                            return [gr.update(visible=(i < num)) for i in range(4)]
+
+                        ms_num_speakers.change(
+                            update_speaker_visibility,
+                            inputs=[ms_num_speakers],
+                            outputs=speaker_blocks,
+                        )
+
+                        gr.Markdown("---")
+
+                        with gr.Row():
+                            ms_language = gr.Dropdown(
+                                label="Язык",
+                                choices=list(LANGUAGES.values()),
+                                value=LANGUAGES["Auto"],
+                                interactive=True,
+                            )
+                            ms_model_size = gr.Dropdown(
+                                label="Размер модели",
+                                choices=MODEL_SIZES,
+                                value="1.7B",
+                                interactive=True,
+                            )
+
+                        with gr.Accordion("Параметры генерации", open=False):
+                            ms_max_tokens = gr.Slider(
+                                label="Макс. токенов",
+                                minimum=256, maximum=4096, value=2048, step=256
+                            )
+                            ms_temperature = gr.Slider(
+                                label="Температура",
+                                minimum=0.1, maximum=2.0, value=0.7, step=0.1
+                            )
+                            ms_top_p = gr.Slider(
+                                label="Top-P",
+                                minimum=0.1, maximum=1.0, value=0.9, step=0.05
+                            )
+
+                    with gr.Column(scale=1, elem_classes="generation-card"):
+                        ms_script = gr.Textbox(
+                            label="Сценарий диалога",
+                            lines=10,
+                            placeholder="Speaker 0: Привет!\nSpeaker 1: Привет, как дела?",
+                            value="Speaker 0: Привет! Ты уже попробовал новую модель Qwen3-TTS?\nSpeaker 1: Да, она отлично работает! Особенно впечатляет качество клонирования голоса.\nSpeaker 0: Согласен, результаты просто потрясающие!",
+                        )
+
+                        with gr.Row():
+                            ms_generate_btn = gr.Button("Сгенерировать диалог", variant="primary", scale=2)
+                            ms_stop_btn = gr.Button("Стоп", variant="stop", scale=1)
+
+                        ms_audio_out = gr.Audio(
+                            label="Результат",
+                            type="numpy",
+                            interactive=False,
+                        )
+                        ms_status = gr.Textbox(
+                            label="Статус",
+                            lines=6,
+                            interactive=False,
+                        )
+
+                # Wrapper для передачи аудио дикторов
+                def multi_speaker_wrapper(script, num_speakers, audio0, audio1, audio2, audio3, text0, text1, text2, text3, language, model_size, max_tokens, temperature, top_p):
+                    audios = [audio0, audio1, audio2, audio3]
+                    texts = [text0, text1, text2, text3]
+                    return generate_multi_speaker(script, num_speakers, audios, texts, language, model_size, max_tokens, temperature, top_p)
+
+                ms_generate_btn.click(
+                    multi_speaker_wrapper,
+                    inputs=[ms_script, ms_num_speakers,
+                            speaker_audios[0], speaker_audios[1], speaker_audios[2], speaker_audios[3],
+                            speaker_texts[0], speaker_texts[1], speaker_texts[2], speaker_texts[3],
+                            ms_language, ms_model_size, ms_max_tokens, ms_temperature, ms_top_p],
+                    outputs=[ms_audio_out, ms_status],
+                )
+                ms_stop_btn.click(stop_generation_fn, outputs=[ms_status])
+
+            # =====================================================
+            # Вкладка 5: Библиотека голосов
+            # =====================================================
+            with gr.Tab("Библиотека голосов", id="voices"):
+                gr.Markdown("### Управление голосами")
+
+                with gr.Row():
+                    with gr.Column(scale=1, elem_classes="settings-card"):
+                        gr.Markdown("#### Локальные голоса")
+                        gr.Markdown("*Голоса сохраняются в папке `voices/`*")
+
+                        def refresh_local_voices():
+                            voices = get_local_voices()
+                            return gr.update(choices=list(voices.keys()), value=None)
+
+                        vl_local_voices = gr.Dropdown(
+                            label="Локальные голоса",
+                            choices=list(get_local_voices().keys()),
+                            interactive=True,
+                        )
+                        vl_refresh_btn = gr.Button("Обновить список", size="sm")
+                        vl_refresh_btn.click(refresh_local_voices, outputs=[vl_local_voices])
+
+                        # Прослушивание выбранного голоса
+                        vl_preview_audio = gr.Audio(
+                            label="Превью голоса",
+                            type="numpy",
+                            interactive=False,
+                        )
+                        vl_preview_text = gr.Textbox(
+                            label="Текст референса",
+                            interactive=False,
+                        )
+
+                        def preview_voice(voice_name):
+                            if not voice_name:
+                                return None, ""
+                            voices = get_local_voices()
+                            path = voices.get(voice_name)
+                            if path:
+                                import soundfile as sf
+                                wav, sr = sf.read(path)
+                                ref_text = get_voice_text(voice_name) or "Текст не указан"
+                                return (sr, wav), ref_text
+                            return None, ""
+
+                        vl_local_voices.change(
+                            preview_voice,
+                            inputs=[vl_local_voices],
+                            outputs=[vl_preview_audio, vl_preview_text],
+                        )
+
+                    with gr.Column(scale=1, elem_classes="generation-card"):
+                        gr.Markdown("#### Загрузка голосов из облака")
+                        gr.Markdown(f"*Репозиторий: `{CLOUD_VOICES_REPO}`*")
+
+                        vl_cloud_status = gr.Textbox(
+                            label="Статус",
+                            interactive=False,
+                            value="Нажмите 'Загрузить список' для получения доступных голосов",
+                        )
+
+                        vl_load_cloud_btn = gr.Button("Загрузить список голосов из облака", variant="primary")
+
+                        vl_cloud_voices = gr.CheckboxGroup(
+                            label="Доступные голоса",
+                            choices=[],
+                            interactive=True,
+                        )
+
+                        vl_download_btn = gr.Button("Скачать выбранные", variant="secondary")
+                        vl_download_status = gr.Textbox(
+                            label="Результат загрузки",
+                            interactive=False,
+                        )
+
+                        def load_cloud_list():
+                            voices, status = get_cloud_voices_list()
+                            if voices:
+                                return status, gr.update(choices=voices, value=[])
+                            return status, gr.update(choices=[], value=[])
+
+                        vl_load_cloud_btn.click(
+                            load_cloud_list,
+                            outputs=[vl_cloud_status, vl_cloud_voices],
+                        )
+
+                        def download_selected_voices(selected):
+                            if not selected:
+                                return "Выберите голоса для загрузки."
+                            results = []
+                            for voice in selected:
+                                result = download_cloud_voice(voice)
+                                results.append(result)
+                            return "\n".join(results)
+
+                        vl_download_btn.click(
+                            download_selected_voices,
+                            inputs=[vl_cloud_voices],
+                            outputs=[vl_download_status],
+                        )
+
+            # =====================================================
+            # Вкладка 6: Дизайн голоса (VoiceDesign)
             # =====================================================
             with gr.Tab("Дизайн голоса", id="design"):
                 gr.Markdown("### Создание голоса по текстовому описанию")
@@ -734,21 +1701,6 @@ def build_ui():
                 )
                 vd_stop_btn.click(stop_generation_fn, outputs=[vd_status])
 
-        # Нижний колонтитул
-        gr.Markdown("""
----
-
-**Qwen3-TTS Portable** - Русскоязычная версия со стримингом
-
-Создано на основе [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) от Alibaba Qwen Team.
-
-**Поддерживаемые языки:** Русский, Английский, Китайский, Японский, Корейский, Французский, Немецкий, Испанский, Португальский, Итальянский
-
-**Системные требования:**
-- GPU: минимум 8GB VRAM для модели 1.7B, 4GB для 0.6B
-- RAM: минимум 16GB
-- При первом запуске модели загружаются из интернета (~4-8GB)
-        """)
 
     return demo
 
@@ -758,9 +1710,9 @@ def build_ui():
 # =====================================================
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Qwen3-TTS Portable - Русскоязычная версия")
-    print("=" * 50)
+    print("=" * 60)
+    print(f"{APP_NAME} v{APP_VERSION}")
+    print("=" * 60)
     print()
 
     # Определяем устройство
@@ -770,6 +1722,17 @@ if __name__ == "__main__":
     if device == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+
+    print()
+    print(f"Директория голосов: {VOICES_DIR}")
+    print(f"Директория профилей: {PROFILES_DIR}")
+    print(f"Директория вывода: {OUTPUT_DIR}")
+
+    local_voices = get_local_voices()
+    print(f"Локальных голосов: {len(local_voices)}")
+
+    profiles = list_voice_profiles()
+    print(f"Сохранённых профилей: {len(profiles)}")
 
     print()
     print("Запуск веб-интерфейса...")
