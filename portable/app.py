@@ -1049,18 +1049,7 @@ def build_ui():
         secondary_hue="purple",
     )
 
-    # JavaScript для установки темной темы по умолчанию (официальный способ)
-    js_dark_theme = """
-    () => {
-        const url = new URL(window.location);
-        if (url.searchParams.get('__theme') !== 'dark') {
-            url.searchParams.set('__theme', 'dark');
-            window.location.href = url.href;
-        }
-    }
-    """
-
-    with gr.Blocks(theme=theme, css=css, title=APP_NAME, js=js_dark_theme) as demo:
+    with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
         # Заголовок
         gr.HTML(f"""
         <div class="main-header">
@@ -1644,5 +1633,5 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         show_error=True,
-        inbrowser=True,
+        inbrowser=False,
     )
