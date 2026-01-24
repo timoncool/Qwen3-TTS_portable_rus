@@ -1468,7 +1468,7 @@ def build_ui():
             # =====================================================
             with gr.Tab("Дизайн голоса", id="design"):
                 gr.Markdown("### Создание голоса по текстовому описанию")
-                gr.Markdown("*Доступно только для модели 1.7B*")
+                gr.Markdown("*Доступно только для модели 1.7B. **Совет:** промпты на английском работают лучше!*")
 
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="settings-card"):
@@ -1476,7 +1476,7 @@ def build_ui():
                             label="Текст для синтеза",
                             lines=4,
                             placeholder="Введите текст, который нужно озвучить...",
-                            value="Это невероятно! Я не могу поверить, что это действительно работает!"
+                            value="Привет! Как твои дела? Это демонстрация синтеза речи."
                         )
 
                         vd_language = gr.Dropdown(
@@ -1487,10 +1487,10 @@ def build_ui():
                         )
 
                         vd_description = gr.Textbox(
-                            label="Описание голоса",
+                            label="Описание голоса (лучше на английском)",
                             lines=3,
-                            placeholder="Опишите желаемый голос и стиль речи...",
-                            value="Говорить с удивлением и восторгом, голос молодой женщины, энергичный и выразительный."
+                            placeholder="Young female voice, warm and friendly...",
+                            value="Young female voice, warm and friendly, speaking with enthusiasm"
                         )
 
                         vd_model_size = gr.Dropdown(
@@ -1528,6 +1528,25 @@ def build_ui():
                             label="Статус",
                             lines=4,
                             interactive=False,
+                        )
+
+                        # Примеры промптов
+                        gr.Markdown("**Готовые промпты** (кликни для применения)")
+                        gr.Examples(
+                            examples=[
+                                ["Young female voice, warm and friendly, gentle smile"],
+                                ["Male voice, deep and authoritative, slow confident pace"],
+                                ["Energetic young man, enthusiastic and excited"],
+                                ["Elderly woman, soft caring voice, speaking slowly"],
+                                ["Professional news anchor, clear neutral tone"],
+                                ["Speak in an angry tone with strong emphasis"],
+                                ["Whisper softly, mysterious and secretive"],
+                                ["Child voice, playful and cheerful, high pitch"],
+                                ["Tired sleepy voice, slow and drowsy"],
+                                ["Speak with surprise and disbelief"],
+                            ],
+                            inputs=[vd_description],
+                            label=""
                         )
 
                 vd_generate_btn.click(
