@@ -13,7 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sox
+# sox import is lazy - only imported when 25Hz tokenizer is actually used
+try:
+    import sox
+    SOX_AVAILABLE = True
+except (ImportError, OSError):
+    sox = None
+    SOX_AVAILABLE = False
 import copy
 import torch
 import operator
@@ -118,6 +124,12 @@ class MelSpectrogramFeatures(nn.Module):
 class XVectorExtractor(nn.Module):
     def __init__(self, audio_codec_with_xvector):
         super().__init__()
+        if not SOX_AVAILABLE:
+            raise ImportError(
+                "SoX is required for 25Hz tokenizer but not found. "
+                "Please install SoX: http://sox.sourceforge.net/ "
+                "Note: 12Hz models don't require SoX."
+            )
         option = onnxruntime.SessionOptions()
         option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         option.intra_op_num_threads = 1
