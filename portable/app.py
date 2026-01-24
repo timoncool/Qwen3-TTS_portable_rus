@@ -1180,6 +1180,16 @@ def build_ui():
 
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="settings-card"):
+                        # Выбор голоса из библиотеки
+                        local_voices = get_local_voices()
+                        vc_voice_preset = gr.Dropdown(
+                            label="Выбрать голос из библиотеки",
+                            choices=["-- Загрузить свой --"] + list(local_voices.keys()),
+                            value="-- Загрузить свой --",
+                            interactive=True,
+                        )
+                        vc_refresh_voices = gr.Button("Обновить список", size="sm")
+
                         vc_ref_audio = gr.Audio(
                             label="Референсное аудио (голос для клонирования)",
                             type="numpy",
@@ -1190,6 +1200,30 @@ def build_ui():
                             lines=2,
                             placeholder="Введите текст, который произносится в референсном аудио...",
                         )
+
+                        def load_voice_preset(voice_name):
+                            if voice_name == "-- Загрузить свой --" or not voice_name:
+                                return None, ""
+                            voices = get_local_voices()
+                            path = voices.get(voice_name)
+                            if path:
+                                import soundfile as sf
+                                wav, sr = sf.read(path)
+                                ref_text = get_voice_text(voice_name) or ""
+                                return (sr, wav), ref_text
+                            return None, ""
+
+                        def refresh_voice_list():
+                            voices = get_local_voices()
+                            return gr.update(choices=["-- Загрузить свой --"] + list(voices.keys()))
+
+                        vc_voice_preset.change(
+                            load_voice_preset,
+                            inputs=[vc_voice_preset],
+                            outputs=[vc_ref_audio, vc_ref_text],
+                        )
+                        vc_refresh_voices.click(refresh_voice_list, outputs=[vc_voice_preset])
+
                         vc_xvector_only = gr.Checkbox(
                             label="Только x-vector (без текста референса, качество ниже)",
                             value=False,
@@ -1247,18 +1281,55 @@ def build_ui():
                             interactive=False,
                         )
 
-                        # Сохранение профиля
-                        with gr.Accordion("Сохранить как профиль", open=False):
-                            vc_profile_name = gr.Textbox(
-                                label="Название профиля",
-                                placeholder="Мой голос",
+                        # Загрузка голосов из облака
+                        with gr.Accordion("Загрузить голоса из облака", open=False):
+                            gr.Markdown(f"*Репозиторий: `{CLOUD_VOICES_REPO}`*")
+
+                            vc_cloud_status = gr.Textbox(
+                                label="Статус",
+                                interactive=False,
+                                value="Нажмите 'Загрузить список' для получения доступных голосов",
                             )
-                            vc_profile_desc = gr.Textbox(
-                                label="Описание (опционально)",
-                                placeholder="Описание голоса...",
+
+                            vc_load_cloud_btn = gr.Button("Загрузить список", variant="secondary")
+
+                            vc_cloud_voices = gr.CheckboxGroup(
+                                label="Доступные голоса",
+                                choices=[],
+                                interactive=True,
                             )
-                            vc_save_profile_btn = gr.Button("Сохранить профиль", variant="secondary")
-                            vc_save_status = gr.Textbox(label="Статус сохранения", interactive=False)
+
+                            vc_download_btn = gr.Button("Скачать выбранные", variant="primary")
+                            vc_download_status = gr.Textbox(
+                                label="Результат загрузки",
+                                interactive=False,
+                            )
+
+                            def load_cloud_list_vc():
+                                voices, status = get_cloud_voices_list()
+                                if voices:
+                                    return status, gr.update(choices=voices, value=[])
+                                return status, gr.update(choices=[], value=[])
+
+                            vc_load_cloud_btn.click(
+                                load_cloud_list_vc,
+                                outputs=[vc_cloud_status, vc_cloud_voices],
+                            )
+
+                            def download_selected_voices_vc(selected):
+                                if not selected:
+                                    return "Выберите голоса для загрузки."
+                                results = []
+                                for voice in selected:
+                                    result = download_cloud_voice(voice)
+                                    results.append(result)
+                                return "\n".join(results)
+
+                            vc_download_btn.click(
+                                download_selected_voices_vc,
+                                inputs=[vc_cloud_voices],
+                                outputs=[vc_download_status],
+                            )
 
                 vc_generate_btn.click(
                     generate_voice_clone,
@@ -1267,114 +1338,8 @@ def build_ui():
                 )
                 vc_stop_btn.click(stop_generation_fn, outputs=[vc_status])
 
-                def save_profile_handler(name, desc, ref_audio, ref_text, xvector_only, model_size):
-                    if not name:
-                        return "Ошибка: Введите название профиля."
-                    audio_tuple = audio_to_tuple(ref_audio)
-                    if audio_tuple is None:
-                        return "Ошибка: Загрузите референсное аудио."
-                    return save_voice_profile(name, desc, audio_tuple, ref_text, xvector_only, model_size)
-
-                vc_save_profile_btn.click(
-                    save_profile_handler,
-                    inputs=[vc_profile_name, vc_profile_desc, vc_ref_audio, vc_ref_text, vc_xvector_only, vc_model_size],
-                    outputs=[vc_save_status],
-                )
-
             # =====================================================
-            # Вкладка 3: Профили голосов
-            # =====================================================
-            with gr.Tab("Профили голосов", id="profiles"):
-                gr.Markdown("### Генерация с сохранёнными профилями голосов")
-                gr.Markdown("*Сохраните профиль на вкладке 'Клонирование голоса' для быстрого повторного использования*")
-
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="settings-card"):
-                        def refresh_profiles():
-                            return gr.update(choices=list_voice_profiles())
-
-                        pf_profile = gr.Dropdown(
-                            label="Выберите профиль",
-                            choices=list_voice_profiles(),
-                            interactive=True,
-                        )
-                        pf_refresh_btn = gr.Button("Обновить список", size="sm")
-                        pf_refresh_btn.click(refresh_profiles, outputs=[pf_profile])
-
-                        pf_text = gr.Textbox(
-                            label="Текст для синтеза",
-                            lines=4,
-                            placeholder="Введите текст для озвучки...",
-                        )
-
-                        with gr.Row():
-                            pf_language = gr.Dropdown(
-                                label="Язык",
-                                choices=list(LANGUAGES.values()),
-                                value=LANGUAGES["Auto"],
-                                interactive=True,
-                            )
-                            pf_model_size = gr.Dropdown(
-                                label="Размер модели",
-                                choices=MODEL_SIZES,
-                                value="1.7B",
-                                interactive=True,
-                            )
-
-                        with gr.Accordion("Параметры генерации", open=False):
-                            pf_max_tokens = gr.Slider(
-                                label="Макс. токенов",
-                                minimum=256, maximum=4096, value=2048, step=256
-                            )
-                            pf_temperature = gr.Slider(
-                                label="Температура",
-                                minimum=0.1, maximum=2.0, value=0.7, step=0.1
-                            )
-                            pf_top_p = gr.Slider(
-                                label="Top-P",
-                                minimum=0.1, maximum=1.0, value=0.9, step=0.05
-                            )
-
-                        with gr.Row():
-                            pf_generate_btn = gr.Button("Сгенерировать", variant="primary", scale=2)
-                            pf_stop_btn = gr.Button("Стоп", variant="stop", scale=1)
-
-                        with gr.Accordion("Управление профилями", open=False):
-                            pf_delete_btn = gr.Button("Удалить выбранный профиль", variant="stop")
-                            pf_delete_status = gr.Textbox(label="Статус", interactive=False)
-
-                            def delete_profile_handler(name):
-                                if not name:
-                                    return "Выберите профиль для удаления."
-                                return delete_voice_profile(name)
-
-                            pf_delete_btn.click(
-                                delete_profile_handler,
-                                inputs=[pf_profile],
-                                outputs=[pf_delete_status],
-                            ).then(refresh_profiles, outputs=[pf_profile])
-
-                    with gr.Column(scale=1, elem_classes="generation-card"):
-                        pf_audio_out = gr.Audio(
-                            label="Результат",
-                            type="numpy",
-                            interactive=False,
-                        )
-                        pf_status = gr.Textbox(
-                            label="Статус",
-                            lines=4,
-                            interactive=False,
-                        )
-
-                pf_generate_btn.click(
-                    generate_with_profile,
-                    inputs=[pf_profile, pf_text, pf_language, pf_model_size, pf_max_tokens, pf_temperature, pf_top_p],
-                    outputs=[pf_audio_out, pf_status],
-                )
-                pf_stop_btn.click(stop_generation_fn, outputs=[pf_status])
-
-            # =====================================================
-            # Вкладка 4: Multi-speaker
+            # Вкладка 3: Multi-speaker
             # =====================================================
             with gr.Tab("Multi-speaker", id="multi"):
                 gr.Markdown("### Генерация диалога с несколькими дикторами")
@@ -1513,7 +1478,7 @@ def build_ui():
                 def multi_speaker_wrapper(script, num_speakers, audio0, audio1, audio2, audio3, text0, text1, text2, text3, language, model_size, max_tokens, temperature, top_p):
                     audios = [audio0, audio1, audio2, audio3]
                     texts = [text0, text1, text2, text3]
-                    return generate_multi_speaker(script, num_speakers, audios, texts, language, model_size, max_tokens, temperature, top_p)
+                    yield from generate_multi_speaker(script, num_speakers, audios, texts, language, model_size, max_tokens, temperature, top_p)
 
                 ms_generate_btn.click(
                     multi_speaker_wrapper,
@@ -1526,109 +1491,7 @@ def build_ui():
                 ms_stop_btn.click(stop_generation_fn, outputs=[ms_status])
 
             # =====================================================
-            # Вкладка 5: Библиотека голосов
-            # =====================================================
-            with gr.Tab("Библиотека голосов", id="voices"):
-                gr.Markdown("### Управление голосами")
-
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="settings-card"):
-                        gr.Markdown("#### Локальные голоса")
-                        gr.Markdown("*Голоса сохраняются в папке `voices/`*")
-
-                        def refresh_local_voices():
-                            voices = get_local_voices()
-                            return gr.update(choices=list(voices.keys()), value=None)
-
-                        vl_local_voices = gr.Dropdown(
-                            label="Локальные голоса",
-                            choices=list(get_local_voices().keys()),
-                            interactive=True,
-                        )
-                        vl_refresh_btn = gr.Button("Обновить список", size="sm")
-                        vl_refresh_btn.click(refresh_local_voices, outputs=[vl_local_voices])
-
-                        # Прослушивание выбранного голоса
-                        vl_preview_audio = gr.Audio(
-                            label="Превью голоса",
-                            type="numpy",
-                            interactive=False,
-                        )
-                        vl_preview_text = gr.Textbox(
-                            label="Текст референса",
-                            interactive=False,
-                        )
-
-                        def preview_voice(voice_name):
-                            if not voice_name:
-                                return None, ""
-                            voices = get_local_voices()
-                            path = voices.get(voice_name)
-                            if path:
-                                import soundfile as sf
-                                wav, sr = sf.read(path)
-                                ref_text = get_voice_text(voice_name) or "Текст не указан"
-                                return (sr, wav), ref_text
-                            return None, ""
-
-                        vl_local_voices.change(
-                            preview_voice,
-                            inputs=[vl_local_voices],
-                            outputs=[vl_preview_audio, vl_preview_text],
-                        )
-
-                    with gr.Column(scale=1, elem_classes="generation-card"):
-                        gr.Markdown("#### Загрузка голосов из облака")
-                        gr.Markdown(f"*Репозиторий: `{CLOUD_VOICES_REPO}`*")
-
-                        vl_cloud_status = gr.Textbox(
-                            label="Статус",
-                            interactive=False,
-                            value="Нажмите 'Загрузить список' для получения доступных голосов",
-                        )
-
-                        vl_load_cloud_btn = gr.Button("Загрузить список голосов из облака", variant="primary")
-
-                        vl_cloud_voices = gr.CheckboxGroup(
-                            label="Доступные голоса",
-                            choices=[],
-                            interactive=True,
-                        )
-
-                        vl_download_btn = gr.Button("Скачать выбранные", variant="secondary")
-                        vl_download_status = gr.Textbox(
-                            label="Результат загрузки",
-                            interactive=False,
-                        )
-
-                        def load_cloud_list():
-                            voices, status = get_cloud_voices_list()
-                            if voices:
-                                return status, gr.update(choices=voices, value=[])
-                            return status, gr.update(choices=[], value=[])
-
-                        vl_load_cloud_btn.click(
-                            load_cloud_list,
-                            outputs=[vl_cloud_status, vl_cloud_voices],
-                        )
-
-                        def download_selected_voices(selected):
-                            if not selected:
-                                return "Выберите голоса для загрузки."
-                            results = []
-                            for voice in selected:
-                                result = download_cloud_voice(voice)
-                                results.append(result)
-                            return "\n".join(results)
-
-                        vl_download_btn.click(
-                            download_selected_voices,
-                            inputs=[vl_cloud_voices],
-                            outputs=[vl_download_status],
-                        )
-
-            # =====================================================
-            # Вкладка 6: Дизайн голоса (VoiceDesign)
+            # Вкладка 4: Дизайн голоса (VoiceDesign)
             # =====================================================
             with gr.Tab("Дизайн голоса", id="design"):
                 gr.Markdown("### Создание голоса по текстовому описанию")
@@ -1745,4 +1608,5 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         show_error=True,
+        inbrowser=True,
     )
