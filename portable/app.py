@@ -1049,10 +1049,14 @@ def build_ui():
         secondary_hue="purple",
     )
 
-    # JavaScript для установки темной темы по умолчанию
+    # JavaScript для установки темной темы по умолчанию (официальный способ)
     js_dark_theme = """
-    () => {
-        document.body.classList.add('dark');
+    function refresh() {
+        const url = new URL(window.location);
+        if (url.searchParams.get('__theme') !== 'dark') {
+            url.searchParams.set('__theme', 'dark');
+            window.location.href = url.href;
+        }
     }
     """
 
