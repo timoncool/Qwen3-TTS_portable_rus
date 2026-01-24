@@ -1180,6 +1180,16 @@ def build_ui():
 
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="settings-card"):
+                        # Выбор голоса из библиотеки
+                        local_voices = get_local_voices()
+                        vc_voice_preset = gr.Dropdown(
+                            label="Выбрать голос из библиотеки",
+                            choices=["-- Загрузить свой --"] + list(local_voices.keys()),
+                            value="-- Загрузить свой --",
+                            interactive=True,
+                        )
+                        vc_refresh_voices = gr.Button("Обновить список", size="sm")
+
                         vc_ref_audio = gr.Audio(
                             label="Референсное аудио (голос для клонирования)",
                             type="numpy",
@@ -1190,6 +1200,30 @@ def build_ui():
                             lines=2,
                             placeholder="Введите текст, который произносится в референсном аудио...",
                         )
+
+                        def load_voice_preset(voice_name):
+                            if voice_name == "-- Загрузить свой --" or not voice_name:
+                                return None, ""
+                            voices = get_local_voices()
+                            path = voices.get(voice_name)
+                            if path:
+                                import soundfile as sf
+                                wav, sr = sf.read(path)
+                                ref_text = get_voice_text(voice_name) or ""
+                                return (sr, wav), ref_text
+                            return None, ""
+
+                        def refresh_voice_list():
+                            voices = get_local_voices()
+                            return gr.update(choices=["-- Загрузить свой --"] + list(voices.keys()))
+
+                        vc_voice_preset.change(
+                            load_voice_preset,
+                            inputs=[vc_voice_preset],
+                            outputs=[vc_ref_audio, vc_ref_text],
+                        )
+                        vc_refresh_voices.click(refresh_voice_list, outputs=[vc_voice_preset])
+
                         vc_xvector_only = gr.Checkbox(
                             label="Только x-vector (без текста референса, качество ниже)",
                             value=False,
@@ -1282,99 +1316,7 @@ def build_ui():
                 )
 
             # =====================================================
-            # Вкладка 3: Профили голосов
-            # =====================================================
-            with gr.Tab("Профили голосов", id="profiles"):
-                gr.Markdown("### Генерация с сохранёнными профилями голосов")
-                gr.Markdown("*Сохраните профиль на вкладке 'Клонирование голоса' для быстрого повторного использования*")
-
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="settings-card"):
-                        def refresh_profiles():
-                            return gr.update(choices=list_voice_profiles())
-
-                        pf_profile = gr.Dropdown(
-                            label="Выберите профиль",
-                            choices=list_voice_profiles(),
-                            interactive=True,
-                        )
-                        pf_refresh_btn = gr.Button("Обновить список", size="sm")
-                        pf_refresh_btn.click(refresh_profiles, outputs=[pf_profile])
-
-                        pf_text = gr.Textbox(
-                            label="Текст для синтеза",
-                            lines=4,
-                            placeholder="Введите текст для озвучки...",
-                        )
-
-                        with gr.Row():
-                            pf_language = gr.Dropdown(
-                                label="Язык",
-                                choices=list(LANGUAGES.values()),
-                                value=LANGUAGES["Auto"],
-                                interactive=True,
-                            )
-                            pf_model_size = gr.Dropdown(
-                                label="Размер модели",
-                                choices=MODEL_SIZES,
-                                value="1.7B",
-                                interactive=True,
-                            )
-
-                        with gr.Accordion("Параметры генерации", open=False):
-                            pf_max_tokens = gr.Slider(
-                                label="Макс. токенов",
-                                minimum=256, maximum=4096, value=2048, step=256
-                            )
-                            pf_temperature = gr.Slider(
-                                label="Температура",
-                                minimum=0.1, maximum=2.0, value=0.7, step=0.1
-                            )
-                            pf_top_p = gr.Slider(
-                                label="Top-P",
-                                minimum=0.1, maximum=1.0, value=0.9, step=0.05
-                            )
-
-                        with gr.Row():
-                            pf_generate_btn = gr.Button("Сгенерировать", variant="primary", scale=2)
-                            pf_stop_btn = gr.Button("Стоп", variant="stop", scale=1)
-
-                        with gr.Accordion("Управление профилями", open=False):
-                            pf_delete_btn = gr.Button("Удалить выбранный профиль", variant="stop")
-                            pf_delete_status = gr.Textbox(label="Статус", interactive=False)
-
-                            def delete_profile_handler(name):
-                                if not name:
-                                    return "Выберите профиль для удаления."
-                                return delete_voice_profile(name)
-
-                            pf_delete_btn.click(
-                                delete_profile_handler,
-                                inputs=[pf_profile],
-                                outputs=[pf_delete_status],
-                            ).then(refresh_profiles, outputs=[pf_profile])
-
-                    with gr.Column(scale=1, elem_classes="generation-card"):
-                        pf_audio_out = gr.Audio(
-                            label="Результат",
-                            type="numpy",
-                            interactive=False,
-                        )
-                        pf_status = gr.Textbox(
-                            label="Статус",
-                            lines=4,
-                            interactive=False,
-                        )
-
-                pf_generate_btn.click(
-                    generate_with_profile,
-                    inputs=[pf_profile, pf_text, pf_language, pf_model_size, pf_max_tokens, pf_temperature, pf_top_p],
-                    outputs=[pf_audio_out, pf_status],
-                )
-                pf_stop_btn.click(stop_generation_fn, outputs=[pf_status])
-
-            # =====================================================
-            # Вкладка 4: Multi-speaker
+            # Вкладка 3: Multi-speaker
             # =====================================================
             with gr.Tab("Multi-speaker", id="multi"):
                 gr.Markdown("### Генерация диалога с несколькими дикторами")
@@ -1526,7 +1468,7 @@ def build_ui():
                 ms_stop_btn.click(stop_generation_fn, outputs=[ms_status])
 
             # =====================================================
-            # Вкладка 5: Библиотека голосов
+            # Вкладка 4: Библиотека голосов
             # =====================================================
             with gr.Tab("Библиотека голосов", id="voices"):
                 gr.Markdown("### Управление голосами")
@@ -1628,7 +1570,7 @@ def build_ui():
                         )
 
             # =====================================================
-            # Вкладка 6: Дизайн голоса (VoiceDesign)
+            # Вкладка 5: Дизайн голоса (VoiceDesign)
             # =====================================================
             with gr.Tab("Дизайн голоса", id="design"):
                 gr.Markdown("### Создание голоса по текстовому описанию")
