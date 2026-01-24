@@ -297,50 +297,32 @@ CLOUD_VOICES_BASE_URL = "https://huggingface.co/datasets/Slait/russia_voices/res
 CLOUD_VOICES_CACHE: List[str] = []
 
 def get_cloud_voices_list() -> Tuple[List[str], str]:
-    """Получение списка голосов из облака."""
+    """Получение списка голосов из облака через HuggingFace API."""
     global CLOUD_VOICES_CACHE
+    import requests
 
-    # Предзаданный список голосов (выборка популярных)
-    # Полный список можно получить через API HuggingFace
-    popular_voices = [
-        # Женские голоса
-        "RU_Female_abramova_oljga",
-        "RU_Female_aleksandrova_nina",
-        "RU_Female_andreeva_zinaida",
-        "RU_Female_artemova_yuliya",
-        "RU_Female_borisova_mariya",
-        "RU_Female_cherkasova_yuliya",
-        "RU_Female_danilova_nataljya",
-        "RU_Female_dmitrova_ekaterina",
-        "RU_Female_frolova_ekaterina",
-        "RU_Female_grishina_anna",
-        "RU_Female_ivanova_oljga",
-        "RU_Female_klimova_elizaveta",
-        "RU_Female_kuznecova_svetlana",
-        "RU_Female_morozova_elena",
-        "RU_Female_semenova_ekaterina",
-        "RU_Female_shitova_tatjyana",
-        "RU_Female_volkova_anna",
-        # Мужские голоса
-        "RU_Male_abdulov_vsevolod",
-        "RU_Male_alekseev_andrey",
-        "RU_Male_baranov_vladimir",
-        "RU_Male_burunov_sergey",
-        "RU_Male_chonishvili_sergey",
-        "RU_Male_dmitriev_kirill",
-        "RU_Male_frolov_sergey",
-        "RU_Male_ivanov_ivan",
-        "RU_Male_klyukvin_aleksandr",
-        "RU_Male_kuznecov_aleksey",
-        "RU_Male_lazarev_aleksey",
-        "RU_Male_morozov_aleksandr",
-        "RU_Male_petrov_viktor",
-        "RU_Male_smirnov_sergey",
-        "RU_Male_yarmoljnik_leonid",
-    ]
+    try:
+        # Получаем список файлов через HuggingFace API
+        api_url = f"https://huggingface.co/api/datasets/{CLOUD_VOICES_REPO}/tree/main"
+        response = requests.get(api_url, timeout=30)
+        response.raise_for_status()
 
-    CLOUD_VOICES_CACHE = popular_voices
-    return popular_voices, f"Найдено {len(popular_voices)} популярных голосов. Репозиторий: {CLOUD_VOICES_REPO}"
+        files = response.json()
+        voices = set()
+
+        for file_info in files:
+            filename = file_info.get("path", "")
+            # Берём только mp3 файлы
+            if filename.endswith(".mp3"):
+                voice_name = filename[:-4]  # Убираем .mp3
+                voices.add(voice_name)
+
+        voice_list = sorted(list(voices))
+        CLOUD_VOICES_CACHE = voice_list
+        return voice_list, f"Найдено {len(voice_list)} голосов. Репозиторий: {CLOUD_VOICES_REPO}"
+
+    except Exception as e:
+        return [], f"Ошибка загрузки списка: {e}"
 
 
 def download_cloud_voice(voice_name: str) -> str:
