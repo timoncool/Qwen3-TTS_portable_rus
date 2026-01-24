@@ -1063,6 +1063,14 @@ def build_ui():
         </div>
         """)
 
+        # Глобальная настройка автовоспроизведения
+        with gr.Row():
+            autoplay_checkbox = gr.Checkbox(
+                label="Автовоспроизведение",
+                value=True,
+                info="Автоматически проигрывать готовое аудио"
+            )
+
         with gr.Tabs() as tabs:
             # =====================================================
             # Вкладка 1: Пресеты голосов (CustomVoice)
@@ -1130,6 +1138,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         cv_status = gr.Textbox(
                             label="Статус",
@@ -1246,6 +1255,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         vc_status = gr.Textbox(
                             label="Статус",
@@ -1439,6 +1449,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         ms_status = gr.Textbox(
                             label="Статус",
@@ -1523,6 +1534,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         vd_status = gr.Textbox(
                             label="Статус",
