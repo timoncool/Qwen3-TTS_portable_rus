@@ -1007,21 +1007,21 @@ def build_ui():
     }
 
     .settings-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(30, 41, 59, 0.95) !important;
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
     .generation-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(30, 41, 59, 0.95) !important;
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
     .speaker-block {
-        background: #f0f0f0;
+        background: #1e293b !important;
         border-radius: 10px;
         padding: 10px;
         margin: 5px 0;
@@ -1032,15 +1032,14 @@ def build_ui():
         padding: 0.75rem 1.5rem !important;
     }
 
-    /* Dark mode support */
-    .dark .settings-card, .dark .generation-card {
-        background: rgba(30, 41, 59, 0.95);
+    /* Исправление белых рамок */
+    .examples-table, .examples-table tbody, .examples-table tr, .examples-table td {
+        background: transparent !important;
+        border: none !important;
     }
-    .dark .main-header {
-        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
-    }
-    .dark .speaker-block {
-        background: #1e293b;
+
+    .prose {
+        color: #e2e8f0 !important;
     }
     """
 
@@ -1048,21 +1047,31 @@ def build_ui():
         font=[gr.themes.GoogleFont("Inter"), "Arial", "sans-serif"],
         primary_hue="indigo",
         secondary_hue="purple",
-    )
+    ).dark()
 
     with gr.Blocks(theme=theme, css=css, title=APP_NAME) as demo:
         # Заголовок
         gr.HTML(f"""
         <div class="main-header">
             <h1>{APP_NAME} v{APP_VERSION}</h1>
-            <p>Синтез речи с Multi-speaker режимом и профилями голосов</p>
-            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem;">
-                Собрал <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">Nerual Dreaming</a> -
-                основатель <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>,
-                техноблогер и нейро-евангелист.
+            <p>Синтез речи с Multi-speaker режимом и клонированием голоса</p>
+            <p style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.5rem;">
+                <a href="https://t.me/nerual_dreming" target="_blank" style="color: white;">@nerual_dreming</a> — основатель
+                <a href="https://artgeneration.me/" target="_blank" style="color: white;">ArtGeneration.me</a>
+            </p>
+            <p style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.3rem;">
+                <a href="https://t.me/neuroport" target="_blank" style="color: white;">Нейро-Софт</a> — репаки и портативки полезных нейросетей
             </p>
         </div>
         """)
+
+        # Глобальная настройка автовоспроизведения
+        with gr.Row():
+            autoplay_checkbox = gr.Checkbox(
+                label="Автовоспроизведение",
+                value=True,
+                info="Автоматически проигрывать готовое аудио"
+            )
 
         with gr.Tabs() as tabs:
             # =====================================================
@@ -1131,11 +1140,29 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         cv_status = gr.Textbox(
                             label="Статус",
                             lines=4,
                             interactive=False,
+                        )
+
+                        # Примеры стилей
+                        gr.Markdown("**Примеры стилей** (кликни для применения)")
+                        gr.Examples(
+                            examples=[
+                                ["Speak with warmth and a gentle smile"],
+                                ["Speak with excitement and high energy"],
+                                ["Speak slowly and calmly, relaxed tone"],
+                                ["Speak with authority and confidence"],
+                                ["Speak softly, like telling a secret"],
+                                ["Speak with sadness in voice"],
+                                ["Speak angrily with sharp emphasis"],
+                                ["Speak in a playful, teasing manner"],
+                            ],
+                            inputs=[cv_instruct],
+                            label=""
                         )
 
                 cv_generate_btn.click(
@@ -1247,6 +1274,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         vc_status = gr.Textbox(
                             label="Статус",
@@ -1440,6 +1468,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         ms_status = gr.Textbox(
                             label="Статус",
@@ -1524,6 +1553,7 @@ def build_ui():
                             label="Результат",
                             type="numpy",
                             interactive=False,
+                            autoplay=True,
                         )
                         vd_status = gr.Textbox(
                             label="Статус",
