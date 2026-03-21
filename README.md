@@ -10,6 +10,16 @@
 - 👥 **Multi-speaker режим** — создание диалогов с несколькими дикторами
 - 🌍 **Мультиязычность** — поддержка 10+ языков включая русский
 
+## Другие портативные нейросети
+
+| Проект | Описание |
+|--------|----------|
+| [Foundation Music Lab](https://github.com/timoncool/RC-stable-audio-tools-portable) | Генерация музыки + таймлайн-редактор |
+| [VibeVoice ASR](https://github.com/timoncool/VibeVoice_ASR_portable_ru) | Распознавание речи (ASR) |
+| [LavaSR](https://github.com/timoncool/LavaSR_portable_ru) | Улучшение качества аудио |
+| [SuperCaption Qwen3-VL](https://github.com/timoncool/SuperCaption_Qwen3-VL) | Генерация описаний изображений |
+| [VideoSOS](https://github.com/timoncool/videosos) | AI-видеопродакшн в браузере |
+
 ## Авторы
 
 **Собрал [Nerual Dreaming](https://t.me/nerual_dreming)** — основатель [ArtGeneration.me](https://artgeneration.me/), техноблогер и нейро-евангелист.
