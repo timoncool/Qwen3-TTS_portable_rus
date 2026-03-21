@@ -12,21 +12,6 @@
 - 👥 **Multi-speaker режим** — создание диалогов с несколькими дикторами
 - 🌍 **Мультиязычность** — поддержка 10+ языков включая русский
 
-## Другие портативные нейросети
-
-| Проект | Описание |
-|--------|----------|
-| [Foundation Music Lab](https://github.com/timoncool/Foundation-Music-Lab) | Генерация музыки + таймлайн-редактор |
-| [VibeVoice ASR](https://github.com/timoncool/VibeVoice_ASR_portable_ru) | Распознавание речи (ASR) |
-| [LavaSR](https://github.com/timoncool/LavaSR_portable_ru) | Улучшение качества аудио |
-| [SuperCaption Qwen3-VL](https://github.com/timoncool/SuperCaption_Qwen3-VL) | Генерация описаний изображений |
-| [VideoSOS](https://github.com/timoncool/videosos) | AI-видеопродакшн в браузере |
-
-## Авторы
-
-- **@Nerual Dreaming** — [neuro-cartel.com](https://neuro-cartel.com) | основатель [ArtGeneration.me](https://artgeneration.me)
-- **Нейро-Софт** ([t.me/neuroport](https://t.me/neuroport)) — репаки и портативки нейросетей
-
 ## Установка
 
 1. Скачайте и распакуйте архив
@@ -75,6 +60,21 @@ Young female voice, warm and friendly, speaking with enthusiasm
 - 🤗 [Hugging Face](https://huggingface.co/collections/Qwen/qwen3-tts)
 - 📑 [Blog](https://qwen.ai/blog?id=qwen3tts-0115)
 - 📑 [Paper](https://arxiv.org/abs/2601.15621)
+
+## Другие портативные нейросети
+
+| Проект | Описание |
+|--------|----------|
+| [Foundation Music Lab](https://github.com/timoncool/Foundation-Music-Lab) | Генерация музыки + таймлайн-редактор |
+| [VibeVoice ASR](https://github.com/timoncool/VibeVoice_ASR_portable_ru) | Распознавание речи (ASR) |
+| [LavaSR](https://github.com/timoncool/LavaSR_portable_ru) | Улучшение качества аудио |
+| [SuperCaption Qwen3-VL](https://github.com/timoncool/SuperCaption_Qwen3-VL) | Генерация описаний изображений |
+| [VideoSOS](https://github.com/timoncool/videosos) | AI-видеопродакшн в браузере |
+
+## Авторы
+
+- **@Nerual Dreaming** — [neuro-cartel.com](https://neuro-cartel.com) | основатель [ArtGeneration.me](https://artgeneration.me)
+- **Нейро-Софт** ([t.me/neuroport](https://t.me/neuroport)) — репаки и портативки нейросетей
 
 ---
 
