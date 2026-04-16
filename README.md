@@ -1,12 +1,19 @@
+<div align="center">
+
 # Qwen3-TTS Portable PRO
 
-[![Stars](https://img.shields.io/github/stars/timoncool/Qwen3-TTS_portable_rus?style=social)](https://github.com/timoncool/Qwen3-TTS_portable_rus/stargazers)
+**Портативный синтез речи с клонированием голоса для Windows — Qwen3-TTS, установка в один клик, 100% офлайн.**
 
-<p align="center">
-    <img src="https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-TTS-Repo/qwen3_tts_logo.png" width="400"/>
-</p>
+[![Stars](https://img.shields.io/github/stars/timoncool/Qwen3-TTS_portable_rus?style=flat-square)](https://github.com/timoncool/Qwen3-TTS_portable_rus/stargazers)
+[![License](https://img.shields.io/github/license/timoncool/Qwen3-TTS_portable_rus?style=flat-square)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/timoncool/Qwen3-TTS_portable_rus?style=flat-square)](https://github.com/timoncool/Qwen3-TTS_portable_rus/commits)
+[![Downloads](https://img.shields.io/github/downloads/timoncool/Qwen3-TTS_portable_rus/total?style=flat-square)](https://github.com/timoncool/Qwen3-TTS_portable_rus/releases)
 
-**Портативная русскоязычная версия** мощной системы синтеза речи Qwen3-TTS с поддержкой:
+<img src="https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-TTS-Repo/qwen3_tts_logo.png" width="400"/>
+
+</div>
+
+Мощная система синтеза речи Qwen3-TTS с поддержкой:
 - 🎙️ **Клонирование голоса** — создание копии голоса из короткого аудио
 - 🎨 **Дизайн голоса** — генерация голоса по текстовому описанию
 - 👥 **Multi-speaker режим** — создание диалогов с несколькими дикторами
@@ -61,24 +68,21 @@ Young female voice, warm and friendly, speaking with enthusiasm
 - 📑 [Blog](https://qwen.ai/blog?id=qwen3tts-0115)
 - 📑 [Paper](https://arxiv.org/abs/2601.15621)
 
-## Другие портативные нейросети
+## Другие проекты [@timoncool](https://github.com/timoncool)
 
 | Проект | Описание |
 |--------|----------|
-| [Foundation Music Lab](https://github.com/timoncool/Foundation-Music-Lab) | Генерация музыки + таймлайн-редактор |
-| [VibeVoice ASR](https://github.com/timoncool/VibeVoice_ASR_portable_ru) | Распознавание речи (ASR) |
-| [LavaSR](https://github.com/timoncool/LavaSR_portable_ru) | Улучшение качества аудио |
-| [SuperCaption Qwen3-VL](https://github.com/timoncool/SuperCaption_Qwen3-VL) | Генерация описаний изображений |
+| [ACE-Step Studio](https://github.com/timoncool/ACE-Step-Studio) | AI-студия музыки — песни, вокал, каверы, клипы |
+| [Foundation Music Lab](https://github.com/timoncool/Foundation-Music-Lab) | Генерация музыки + редактор таймлайна |
+| [VibeVoice ASR](https://github.com/timoncool/VibeVoice_ASR_portable_ru) | Портативное распознавание речи |
+| [LavaSR](https://github.com/timoncool/LavaSR_portable_ru) | Портативное улучшение аудио |
+| [SuperCaption Qwen3-VL](https://github.com/timoncool/SuperCaption_Qwen3-VL) | Портативное описание изображений |
 | [VideoSOS](https://github.com/timoncool/videosos) | AI-видеопродакшн в браузере |
 
 ## Авторы
 
 - **Nerual Dreming** ([t.me/nerual_dreming](https://t.me/nerual_dreming)) — [neuro-cartel.com](https://neuro-cartel.com) | основатель [ArtGeneration.me](https://artgeneration.me)
 - **Нейро-Софт** ([t.me/neuroport](https://t.me/neuroport)) — репаки и портативки нейросетей
-
----
-
-> **Если проект полезен — поставьте звёздочку!**
 
 ## Поддержать автора
 
@@ -95,8 +99,8 @@ Young female voice, warm and friendly, speaking with enthusiasm
 
 <a href="https://www.star-history.com/?repos=timoncool%2FQwen3-TTS_portable_rus&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=timoncool/Qwen3-TTS_portable_rus&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=timoncool/Qwen3-TTS_portable_rus&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=timoncool/Qwen3-TTS_portable_rus&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=timoncool/Qwen3-TTS_portable_rus&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=timoncool/Qwen3-TTS_portable_rus&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=timoncool/Qwen3-TTS_portable_rus&type=date&legend=top-left" />
  </picture>
 </a>
