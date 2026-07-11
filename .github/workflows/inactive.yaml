@@ -16,16 +16,16 @@ jobs:
           days-before-issue-close: 30
           stale-issue-label: inactive
           stale-issue-message: >
-            This issue has been automatically marked as inactive 
-            due to lack of recent activity. 
-            Should you believe it remains unresolved and warrants attention, 
-            kindly leave a comment on this thread. 
+            This issue has been automatically marked as inactive
+            due to lack of recent activity.
+            Should you believe it remains unresolved and warrants attention,
+            kindly leave a comment on this thread.
           exempt-issue-labels: enhancement,discussion
           days-before-pr-stale: -1
           days-before-pr-close: -1
           operations-per-run: 128
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: dessant/lock-threads@v5
+      - uses: dessant/lock-threads@v6
         with:
           issue-inactive-days: 60
           issue-comment: >
@@ -37,4 +37,4 @@ jobs:
             This pull request has been automatically locked since there
             has not been any recent activity after it was closed.
             Please open a new issue for related bugs.
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
