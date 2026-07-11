@@ -2,6 +2,7 @@ name: Close and lock inactive threads
 on:
   schedule:
     - cron: "0 8 * * *"
+  workflow_dispatch:
 jobs:
   manage-inactive:
     runs-on: ubuntu-latest
